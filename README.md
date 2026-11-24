@@ -1,6 +1,6 @@
 # Monitor de conforto térmico — Climando
 
-Coleta temperatura do ar e fluxo de tráfego por ponto, calcula o IDTE (TCC de Davi Lopes da Costa, UFCG, 2026) e publica no HostGator.
+Coleta temperatura do ar e fluxo de tráfego por ponto, calcula o IDTE (A base metodológica vem do TCC de Davi Lopes da Costa, UFCG, 2026)
 
 ## Como funciona
 GitHub Actions roda `coletor.py` e `publicar_ftp.py` a cada 15 min (05h–19h). Os arquivos chegam em `public_html/dados/` (`conforto_latest.json` e `hist_AAAA-MM-DD.csv`). A página `conforto.html` lê o JSON; nenhuma chave de API fica no navegador.
