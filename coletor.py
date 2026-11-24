@@ -7,7 +7,7 @@ Para cada ponto de pontos.json consulta:
 e calcula o Índice de Desconforto Térmico Estimado (IDTE), conforme o TCC de Davi Lopes
 da Costa (UFCG, 2026), com uma diferença: o resultado é truncado entre 0 e 100.
 
-Saídas (pasta saida/):
+Saídas (pasta saida/), uma por cidade (ver CIDADES):
   conforto_latest.json         estado atual, lido pela página conforto.html
   hist_AAAA-MM-DD.csv          linhas desta coleta (o publicar_ftp.py junta com as anteriores)
 
@@ -28,6 +28,12 @@ from datetime import datetime, timedelta, timezone
 FUSO = timezone(timedelta(hours=-3))  # Paraíba: UTC-3, sem horário de verão
 AQUI = os.path.dirname(os.path.abspath(__file__))
 SAIDA = os.path.join(AQUI, "saida")
+
+# Cidades monitoradas: arquivo de pontos, arquivo de saída e prefixo do histórico.
+CIDADES = {
+    "campina": {"pontos": "pontos.json", "latest": "conforto_latest.json", "hist": "hist"},
+    "recife": {"pontos": "pontos_recife.json", "latest": "conforto_recife_latest.json", "hist": "hist_recife"},
+}
 
 T_REFERENCIA = 25.0   # °C, neutralidade (TCC, Eq. 2)
 PESO = 8.0            # fator de ponderação empírico (TCC, Eq. 2)
@@ -167,10 +173,51 @@ def verificar(pontos, chave):
             print(f"{p['id']}: erro {e}")
 
 
+def processar_cidade(chave, cfg, args, chave_tt, chave_owm, agora):
+    """Coleta uma cidade, grava saida/<latest> e o CSV do dia. Devolve (pontos ok, total)."""
+    with open(os.path.join(AQUI, cfg["pontos"]), encoding="utf-8") as f:
+        pontos = json.load(f)["pontos"]
+    resultados = [coletar_ponto(p, args, chave_tt, chave_owm) for p in pontos]
+    ok = sum(1 for r in resultados if r["status"] == "ok")
+    if ok == 0 and not args.simular:
+        print(f"{chave}: nenhum ponto válido; arquivo não atualizado")
+        for r in resultados[:3]:
+            print(f"  - {r['id']}: {'; '.join(r['erros'])}")
+        return 0, len(resultados)
+
+    os.makedirs(SAIDA, exist_ok=True)
+    doc = {
+        "versao": 1,
+        "cidade": chave,
+        "gerado_em": agora.isoformat(timespec="seconds"),
+        "simulado": bool(args.simular),
+        "pontos": resultados,
+    }
+    with open(os.path.join(SAIDA, cfg["latest"]), "w", encoding="utf-8") as f:
+        json.dump(doc, f, ensure_ascii=False, indent=1)
+
+    caminho_csv = os.path.join(SAIDA, f"{cfg['hist']}_{agora:%Y-%m-%d}.csv")
+    with open(caminho_csv, "w", encoding="utf-8", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["data_hora", "id", "temp_ar", "vel_atual", "vel_livre",
+                    "fator_transito", "idte_bruto", "idte", "classe", "status"])
+        for r in resultados:
+            w.writerow([agora.isoformat(timespec="seconds"), r["id"], r["temp_ar"], r["vel_atual"],
+                        r["vel_livre"], r["fator_transito"], r["idte_bruto"], r["idte"],
+                        r["classe"], r["status"]])
+
+    print(f"{agora:%H:%M} {chave}: {ok}/{len(resultados)} pontos ok")
+    for r in resultados:
+        if r["erros"]:
+            print(f"  - {r['id']}: {'; '.join(r['erros'])}")
+    return ok, len(resultados)
+
+
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--cidade", default="todas", choices=["todas"] + list(CIDADES),
+                    help="cidade a coletar (padrão: todas)")
     ap.add_argument("--verificar", action="store_true", help="mostra o trecho de via associado a cada ponto e sai")
-    ap.add_argument("--pontos", default=os.path.join(AQUI, "pontos.json"))
     ap.add_argument("--simular", action="store_true", help="não chama APIs; gera valores fictícios para teste")
     args = ap.parse_args()
 
@@ -181,43 +228,22 @@ def main():
     if os.environ.get("TEMP_FONTE", "openmeteo").lower() == "owm" and not chave_owm and not args.simular:
         sys.exit("TEMP_FONTE=owm exige OWM_KEY.")
 
-    with open(args.pontos, encoding="utf-8") as f:
-        pontos = json.load(f)["pontos"]
+    escolhidas = list(CIDADES) if args.cidade == "todas" else [args.cidade]
+
     if args.verificar:
-        if not chave_tt:
-            sys.exit("Defina TOMTOM_KEY.")
-        return verificar(pontos, chave_tt)
+        for c in escolhidas:
+            print(f"== {c} ==")
+            with open(os.path.join(AQUI, CIDADES[c]["pontos"]), encoding="utf-8") as f:
+                verificar(json.load(f)["pontos"], chave_tt)
+        return
 
     agora = datetime.now(FUSO)
-    resultados = [coletar_ponto(p, args, chave_tt, chave_owm) for p in pontos]
-
-    os.makedirs(SAIDA, exist_ok=True)
-    doc = {
-        "versao": 1,
-        "gerado_em": agora.isoformat(timespec="seconds"),
-        "simulado": bool(args.simular),
-        "pontos": resultados,
-    }
-    with open(os.path.join(SAIDA, "conforto_latest.json"), "w", encoding="utf-8") as f:
-        json.dump(doc, f, ensure_ascii=False, indent=1)
-
-    caminho_csv = os.path.join(SAIDA, f"hist_{agora:%Y-%m-%d}.csv")
-    with open(caminho_csv, "w", encoding="utf-8", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(["data_hora", "id", "temp_ar", "vel_atual", "vel_livre",
-                    "fator_transito", "idte_bruto", "idte", "classe", "status"])
-        for r in resultados:
-            w.writerow([agora.isoformat(timespec="seconds"), r["id"], r["temp_ar"], r["vel_atual"],
-                        r["vel_livre"], r["fator_transito"], r["idte_bruto"], r["idte"],
-                        r["classe"], r["status"]])
-
-    ok = sum(1 for r in resultados if r["status"] == "ok")
-    print(f"{agora:%H:%M} coleta: {ok}/{len(resultados)} pontos ok")
-    for r in resultados:
-        if r["erros"]:
-            print(f"  - {r['id']}: {'; '.join(r['erros'])}")
-    if ok == 0:
-        sys.exit(1)  # não publica um arquivo sem nenhum dado válido
+    total_ok = 0
+    for c in escolhidas:
+        ok, _ = processar_cidade(c, CIDADES[c], args, chave_tt, chave_owm, agora)
+        total_ok += ok
+    if total_ok == 0 and not args.simular:
+        sys.exit(1)  # nada válido em nenhuma cidade: não publica
 
 
 if __name__ == "__main__":

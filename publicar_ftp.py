@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Envia saida/conforto_latest.json e o histórico do dia ao HostGator por FTP/FTPS.
+"""Envia saida/conforto*_latest.json (uma por cidade) e o histórico do dia ao HostGator por FTP/FTPS.
 
 O histórico diário é montado sem guardar estado no GitHub: baixa o CSV do dia que já está
 no servidor, acrescenta as linhas desta coleta e sobe de volta.
@@ -58,15 +58,16 @@ def baixar(ftp, nome):
 
 
 def main():
-    latest = os.path.join(SAIDA, "conforto_latest.json")
-    if not os.path.exists(latest):
-        sys.exit("saida/conforto_latest.json não encontrado; rode coletor.py antes.")
+    latests = sorted(glob.glob(os.path.join(SAIDA, "conforto*_latest.json")))
+    if not latests:
+        sys.exit("nenhum saida/conforto*_latest.json encontrado; rode coletor.py antes.")
 
     ftp = conectar()
     try:
         entrar_na_pasta(ftp, os.environ.get("FTP_DIR", "public_html/dados"))
-        with open(latest, "rb") as f:
-            enviar_atomico(ftp, "conforto_latest.json", f.read())
+        for caminho in latests:
+            with open(caminho, "rb") as f:
+                enviar_atomico(ftp, os.path.basename(caminho), f.read())
 
         for csv_local in sorted(glob.glob(os.path.join(SAIDA, "hist_*.csv"))):
             nome = os.path.basename(csv_local)
