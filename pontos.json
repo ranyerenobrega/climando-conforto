@@ -1,0 +1,113 @@
+{
+  "_comentario": "Coordenadas obtidas no Google Places em 23/11/2026 (pontos de referência em vias movimentadas ou centroides de bairro). Rode 'python coletor.py --verificar' uma vez com a TOMTOM_KEY para ver a que trecho de via cada ponto foi associado e trocar os que cairem em rua sem dado. efeito_ilha vem do Quadro 2 do TCC; os corredores de tráfego não têm coeficiente no TCC e aparecem sem índice.",
+  "pontos": [
+    {
+      "id": "centro",
+      "nome": "Centro",
+      "categoria": "Núcleo histórico",
+      "efeito_ilha": 3.8,
+      "lat": -7.2195322,
+      "lon": -35.8851604,
+      "referencia": "Praça da Bandeira"
+    },
+    {
+      "id": "sao_jose",
+      "nome": "São José",
+      "categoria": "Núcleo histórico",
+      "efeito_ilha": 3.0,
+      "lat": -7.2283843,
+      "lon": -35.8904244,
+      "referencia": "Av. Prof. Almeida Barreto"
+    },
+    {
+      "id": "prata",
+      "nome": "Prata",
+      "categoria": "Núcleo histórico",
+      "efeito_ilha": 3.0,
+      "lat": -7.219399,
+      "lon": -35.8947759,
+      "referencia": "centroide do bairro"
+    },
+    {
+      "id": "catole",
+      "nome": "Catolé",
+      "categoria": "Núcleo histórico",
+      "efeito_ilha": 3.2,
+      "lat": -7.2348572,
+      "lon": -35.8695855,
+      "referencia": "Av. Severino Bezerra Cabral (Partage)"
+    },
+    {
+      "id": "malvinas",
+      "nome": "Malvinas",
+      "categoria": "Zona de expansão",
+      "efeito_ilha": 3.5,
+      "lat": -7.2365555,
+      "lon": -35.9245633,
+      "referencia": "Av. Plínio Lemos"
+    },
+    {
+      "id": "serrotao",
+      "nome": "Serrotão",
+      "categoria": "Zona de expansão",
+      "efeito_ilha": 3.6,
+      "lat": -7.2139698,
+      "lon": -35.9424413,
+      "referencia": "centroide do bairro"
+    },
+    {
+      "id": "tres_irmas",
+      "nome": "Três Irmãs",
+      "categoria": "Zona de expansão",
+      "efeito_ilha": 3.6,
+      "lat": -7.2600104,
+      "lon": -35.9315489,
+      "referencia": "centroide do bairro"
+    },
+    {
+      "id": "alto_branco",
+      "nome": "Alto Branco",
+      "categoria": "Ponto de controle",
+      "efeito_ilha": 0.5,
+      "lat": -7.203853,
+      "lon": -35.8797893,
+      "referencia": "centroide do bairro"
+    },
+    {
+      "id": "alpargatas",
+      "nome": "Acesso Alpargatas",
+      "categoria": "Corredor de tráfego",
+      "efeito_ilha": null,
+      "lat": -7.2668635,
+      "lon": -35.8881313,
+      "referencia": "Av. Assis Chateaubriand"
+    },
+    {
+      "id": "trauma",
+      "nome": "Hospital de Trauma",
+      "categoria": "Corredor de tráfego",
+      "efeito_ilha": null,
+      "lat": -7.2396739,
+      "lon": -35.9319571,
+      "referencia": "Av. Floriano Peixoto"
+    },
+    {
+      "id": "ufcg",
+      "nome": "UFCG",
+      "categoria": "Corredor de tráfego",
+      "efeito_ilha": null,
+      "lat": -7.2171368,
+      "lon": -35.9097543,
+      "referencia": "R. Aprígio Veloso"
+    },
+    {
+      "id": "uepb",
+      "nome": "UEPB",
+      "categoria": "Corredor de tráfego",
+      "efeito_ilha": null,
+      "lat": -7.2089912,
+      "lon": -35.9173302,
+      "referencia": "R. Baraúnas"
+    }
+  ]
+}

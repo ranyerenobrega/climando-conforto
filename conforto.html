@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#22475A">
+<title>Conforto térmico no trânsito de Campina Grande | Climando</title>
+<meta name="description" content="Estimativa do desconforto térmico no trânsito de Campina Grande-PB, atualizada a cada 15 minutos a partir de temperatura do ar e fluxo de tráfego.">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root { --azul:#22475A; --quente:#E4572E; --areia:#FBF4EA; --texto:#2b2b2b; --cinza:#6b7280;
+          --verde:#2e9e4f; --amarelo:#e0a100; --vermelho:#d64545; --neutro:#8a8f98; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:var(--texto); background:var(--areia); line-height:1.5; }
+  /* Substitua este bloco pelo cabeçalho/menu das outras páginas do Climando */
+  header.topo { background:var(--azul); color:#fff; padding:14px 18px; }
+  header.topo a { color:#fff; text-decoration:none; font-weight:600; }
+  main { max-width:1100px; margin:0 auto; padding:18px; }
+  h1 { font-size:1.5rem; margin:.2rem 0 .3rem; color:var(--azul); }
+  .sub { color:var(--cinza); margin:0 0 .8rem; }
+  #status { display:inline-block; padding:4px 10px; border-radius:999px; font-size:.85rem; background:#e7f3ea; color:#1d6b37; }
+  #status.velho { background:#fdecec; color:#9b2c2c; }
+  .grade { display:grid; grid-template-columns:1fr 340px; gap:16px; margin-top:14px; }
+  #mapa { height:520px; border-radius:12px; border:1px solid #e5d9c6; }
+  #lista { display:flex; flex-direction:column; gap:8px; max-height:520px; overflow:auto; }
+  .cartao { background:#fff; border:1px solid #e5d9c6; border-left:6px solid var(--neutro); border-radius:10px; padding:10px 12px; cursor:pointer; }
+  .cartao.conforto { border-left-color:var(--verde); }
+  .cartao.desconforto_inicial { border-left-color:var(--amarelo); }
+  .cartao.desconforto_elevado { border-left-color:var(--vermelho); }
+  .cartao h3 { margin:0; font-size:1rem; display:flex; justify-content:space-between; gap:8px; }
+  .cartao small { color:var(--cinza); }
+  .idte { font-weight:700; }
+  .legenda { display:flex; flex-wrap:wrap; gap:14px; margin:10px 0; font-size:.88rem; }
+  .legenda i { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
+  .aviso { background:#fff; border:1px solid #e5d9c6; border-radius:12px; padding:14px 16px; margin-top:18px; font-size:.92rem; }
+  .aviso h2 { font-size:1.05rem; margin:.1rem 0 .4rem; color:var(--azul); }
+  footer { color:var(--cinza); font-size:.82rem; margin:18px 0 30px; }
+  @media (max-width:820px) { .grade { grid-template-columns:1fr; } #mapa { height:380px; } #lista { max-height:none; } }
+</style>
+</head>
+<body>
+<header class="topo"><a href="index.html">Climando</a></header>
+<main>
+  <h1>Conforto térmico no trânsito de Campina Grande</h1>
+  <p class="sub">Estimativa por ponto, combinando temperatura do ar, efeito de ilha de calor e fluxo de tráfego. <span id="status">carregando…</span></p>
+
+  <div class="legenda">
+    <span><i style="background:var(--verde)"></i>Conforto estimado (&lt; 45%)</span>
+    <span><i style="background:var(--amarelo)"></i>Desconforto inicial (45–74%)</span>
+    <span><i style="background:var(--vermelho)"></i>Desconforto elevado (≥ 75%)</span>
+    <span><i style="background:var(--neutro)"></i>Sem índice</span>
+  </div>
+
+  <div class="grade">
+    <div id="mapa" role="img" aria-label="Mapa dos pontos monitorados em Campina Grande"></div>
+    <div id="lista"></div>
+  </div>
+
+  <section class="aviso">
+    <h2>Como ler este indicador</h2>
+    <p>O Índice de Desconforto Térmico Estimado (IDTE) é uma heurística didática, desenvolvida no TCC "EcoTrânsito" (UFCG, 2026). Ele soma à temperatura do ar um acréscimo fixo por bairro, tirado da literatura sobre ilhas de calor em Campina Grande, e multiplica o excedente sobre 25 °C por um fator que cresce com a lentidão do tráfego. O resultado é limitado entre 0 e 100%.</p>
+    <p>Os parâmetros são convenções pedagógicas e ainda não foram validados com medições de campo. O índice não mede estresse nem comportamento de motoristas e não substitui índices bioclimáticos consagrados, como o Índice de Desconforto de Thom ou o UTCI. Pontos sem coeficiente de ilha de calor mostram só temperatura e tráfego.</p>
+  </section>
+
+  <footer>
+    Temperatura do ar: <a href="https://open-meteo.com/">Open-Meteo</a> (CC BY 4.0). Tráfego: © <a href="https://www.tomtom.com/">TomTom</a>. Mapa: © colaboradores do <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
+    Grupo TROPOCLIMA, UFCG.
+  </footer>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  var ROTULOS = {
+    conforto: "Conforto estimado",
+    desconforto_inicial: "Desconforto inicial",
+    desconforto_elevado: "Desconforto elevado",
+    sem_indice: "Sem índice"
+  };
+  var CORES = { conforto: "#2e9e4f", desconforto_inicial: "#e0a100", desconforto_elevado: "#d64545", sem_indice: "#8a8f98" };
+  var LIMITE_VELHO_MIN = 30;
+  var URL_DADOS = "dados/conforto_latest.json";
+
+  var mapa = L.map("mapa").setView([-7.23, -35.88], 12);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "&copy; colaboradores do OpenStreetMap"
+  }).addTo(mapa);
+
+  var camada = L.layerGroup().addTo(mapa);
+  var primeiraVez = true;
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function num(v, casas, un) {
+    return v == null ? "—" : Number(v).toFixed(casas).replace(".", ",") + (un || "");
+  }
+  function detalhe(p) {
+    return "<strong>" + esc(p.nome) + "</strong><br><small>" + esc(p.categoria || "") + "</small><br>" +
+      "Temperatura do ar: " + num(p.temp_ar, 1, " °C") + "<br>" +
+      (p.efeito_ilha != null ? "Acréscimo de ilha de calor: +" + num(p.efeito_ilha, 1, " °C") + "<br>" : "") +
+      "Velocidade no trecho: " + num(p.vel_atual, 0, " km/h") + " (fluxo livre " + num(p.vel_livre, 0, " km/h") + ")<br>" +
+      "Fator de trânsito: " + num(p.fator_transito, 2) + "<br>" +
+      "IDTE: <strong>" + (p.idte == null ? "—" : num(p.idte, 0, "%")) + "</strong> · " + esc(ROTULOS[p.classe] || "");
+  }
+
+  function render(doc) {
+    var lista = document.getElementById("lista");
+    lista.innerHTML = "";
+    camada.clearLayers();
+    var limites = [];
+    doc.pontos.forEach(function (p) {
+      var classe = CORES[p.classe] ? p.classe : "sem_indice";
+      var cartao = document.createElement("div");
+      cartao.className = "cartao " + classe;
+      cartao.innerHTML = "<h3><span>" + esc(p.nome) + "</span><span class='idte'>" +
+        (p.idte == null ? "—" : num(p.idte, 0, "%")) + "</span></h3>" +
+        "<small>" + esc(ROTULOS[classe]) + " · ar " + num(p.temp_ar, 1, " °C") + " · fator " + num(p.fator_transito, 2) + "</small>";
+      lista.appendChild(cartao);
+      if (p.lat != null && p.lon != null) {
+        var m = L.circleMarker([p.lat, p.lon], {
+          radius: 11, color: "#fff", weight: 2, fillColor: CORES[classe], fillOpacity: 0.95
+        }).addTo(camada).bindPopup(detalhe(p));
+        cartao.addEventListener("click", function () { mapa.setView([p.lat, p.lon], 14); m.openPopup(); });
+        limites.push([p.lat, p.lon]);
+      }
+    });
+    if (primeiraVez && limites.length > 1) { mapa.fitBounds(limites, { padding: [30, 30] }); primeiraVez = false; }
+  }
+
+  function atualizarStatus(doc) {
+    var el = document.getElementById("status");
+    var minutos = Math.round((Date.now() - new Date(doc.gerado_em).getTime()) / 60000);
+    var hora = new Date(doc.gerado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Fortaleza" });
+    if (doc.simulado) {
+      el.textContent = "dados de teste (simulados)"; el.className = "velho"; return;
+    }
+    if (minutos > LIMITE_VELHO_MIN) {
+      el.textContent = "dados desatualizados: última leitura às " + hora; el.className = "velho";
+    } else {
+      el.textContent = "atualizado às " + hora + " (há " + Math.max(minutos, 0) + " min)"; el.className = "";
+    }
+  }
+
+  function carregar() {
+    fetch(URL_DADOS + "?t=" + Date.now(), { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (doc) { render(doc); atualizarStatus(doc); })
+      .catch(function () {
+        var el = document.getElementById("status");
+        el.textContent = "não foi possível carregar os dados agora"; el.className = "velho";
+      });
+  }
+  carregar();
+  setInterval(carregar, 5 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
