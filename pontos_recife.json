@@ -2,13 +2,131 @@
   "_comentario": "Coordenadas obtidas no Google Places em 24/11/2026. ATENÇÃO: o TCC cobre apenas Campina Grande, então NÃO existem coeficientes de ilha de calor publicados para Recife neste projeto. Os valores de efeito_ilha abaixo são PROVISÓRIOS: foram atribuídos por analogia de uso do solo com as classes de Campina Grande (núcleo adensado ~3,0 a 3,8; expansão urbana ~3,5; área arborizada/controle ~0,5). Substitua por valores medidos ou da literatura de Recife assim que os tiver. Os corredores de tráfego não têm coeficiente e aparecem sem índice. Rode 'python coletor.py --verificar --cidade recife' com a TOMTOM_KEY para checar a via associada a cada ponto.",
   "efeito_ilha_provisorio": true,
   "pontos": [
-    {"id": "recife_antigo", "nome": "Recife Antigo (Marco Zero)", "categoria": "Núcleo histórico", "efeito_ilha": 3.0, "lat": -8.0617353, "lon": -34.8706873, "referencia": "Praça Rio Branco"},
-    {"id": "boa_vista", "nome": "Boa Vista (Av. Conde da Boa Vista)", "categoria": "Centro expandido", "efeito_ilha": 3.8, "lat": -8.0585109, "lon": -34.8883797, "referencia": "Av. Conde da Boa Vista"},
-    {"id": "boa_viagem", "nome": "Boa Viagem", "categoria": "Zona de expansão", "efeito_ilha": 3.2, "lat": -8.1190456, "lon": -34.9046689, "referencia": "Shopping Recife"},
-    {"id": "varzea_tip", "nome": "Várzea (TIP)", "categoria": "Zona de expansão", "efeito_ilha": 3.5, "lat": -8.063322, "lon": -34.982395, "referencia": "Terminal Integrado de Passageiros"},
-    {"id": "caxanga", "nome": "Caxangá (Cordeiro)", "categoria": "Zona de expansão", "efeito_ilha": 3.5, "lat": -8.0483487, "lon": -34.9250438, "referencia": "Av. Caxangá"},
-    {"id": "jaqueira", "nome": "Graças (Parque da Jaqueira)", "categoria": "Ponto de controle", "efeito_ilha": 0.5, "lat": -8.0367962, "lon": -34.9046715, "referencia": "Parque da Jaqueira"},
-    {"id": "ponte_agamenon", "nome": "Ponte Agamenon Magalhães (Pina)", "categoria": "Corredor de tráfego", "efeito_ilha": null, "lat": -8.0821263, "lon": -34.8897987, "referencia": "Ponte Gov. Agamenon Magalhães"},
-    {"id": "aeroporto", "nome": "Imbiribeira (Aeroporto)", "categoria": "Corredor de tráfego", "efeito_ilha": null, "lat": -8.1287392, "lon": -34.9258526, "referencia": "Aeroporto Internacional do Recife"}
+    {
+      "id": "recife_antigo",
+      "nome": "Recife Antigo (Marco Zero)",
+      "categoria": "Núcleo histórico",
+      "efeito_ilha": 3.0,
+      "lat": -8.0617353,
+      "lon": -34.8706873,
+      "referencia": "Praça Rio Branco"
+    },
+    {
+      "id": "boa_vista",
+      "nome": "Boa Vista (Av. Conde da Boa Vista)",
+      "categoria": "Centro expandido",
+      "efeito_ilha": 3.8,
+      "lat": -8.0585109,
+      "lon": -34.8883797,
+      "referencia": "Av. Conde da Boa Vista"
+    },
+    {
+      "id": "boa_viagem",
+      "nome": "Boa Viagem",
+      "categoria": "Zona de expansão",
+      "efeito_ilha": 3.2,
+      "lat": -8.1190456,
+      "lon": -34.9046689,
+      "referencia": "Shopping Recife"
+    },
+    {
+      "id": "varzea_tip",
+      "nome": "Várzea (TIP)",
+      "categoria": "Zona de expansão",
+      "efeito_ilha": 3.5,
+      "lat": -8.063322,
+      "lon": -34.982395,
+      "referencia": "Terminal Integrado de Passageiros"
+    },
+    {
+      "id": "caxanga",
+      "nome": "Caxangá (Cordeiro)",
+      "categoria": "Zona de expansão",
+      "efeito_ilha": 3.5,
+      "lat": -8.0483487,
+      "lon": -34.9250438,
+      "referencia": "Av. Caxangá"
+    },
+    {
+      "id": "jaqueira",
+      "nome": "Graças (Parque da Jaqueira)",
+      "categoria": "Ponto de controle",
+      "efeito_ilha": 0.5,
+      "lat": -8.0367962,
+      "lon": -34.9046715,
+      "referencia": "Parque da Jaqueira"
+    },
+    {
+      "id": "ponte_agamenon",
+      "nome": "Ponte Agamenon Magalhães (Pina)",
+      "categoria": "Corredor de tráfego",
+      "efeito_ilha": null,
+      "lat": -8.0821263,
+      "lon": -34.8897987,
+      "referencia": "Ponte Gov. Agamenon Magalhães"
+    },
+    {
+      "id": "aeroporto",
+      "nome": "Imbiribeira (Aeroporto)",
+      "categoria": "Corredor de tráfego",
+      "efeito_ilha": null,
+      "lat": -8.1287392,
+      "lon": -34.9258526,
+      "referencia": "Aeroporto Internacional do Recife"
+    },
+    {
+      "id": "derby",
+      "nome": "Derby (Av. Agamenon Magalhães)",
+      "categoria": "Centro expandido",
+      "efeito_ilha": 3.8,
+      "lat": -8.0559239,
+      "lon": -34.8982179,
+      "referencia": "Praça do Derby"
+    },
+    {
+      "id": "casa_amarela",
+      "nome": "Casa Amarela (Estrada do Arraial)",
+      "categoria": "Zona de expansão",
+      "efeito_ilha": 3.5,
+      "lat": -8.0266743,
+      "lon": -34.9172638,
+      "referencia": "Estrada do Arraial"
+    },
+    {
+      "id": "pina",
+      "nome": "Pina (RioMar)",
+      "categoria": "Zona de expansão",
+      "efeito_ilha": 3.2,
+      "lat": -8.086054,
+      "lon": -34.8947486,
+      "referencia": "Shopping RioMar"
+    },
+    {
+      "id": "ibura",
+      "nome": "Ibura (Av. Dois Rios)",
+      "categoria": "Zona de expansão",
+      "efeito_ilha": 3.5,
+      "lat": -8.1119408,
+      "lon": -34.9379206,
+      "referencia": "Av. Dois Rios"
+    },
+    {
+      "id": "av_recife",
+      "nome": "Avenida Recife (Afogados)",
+      "categoria": "Corredor de tráfego",
+      "efeito_ilha": null,
+      "lat": -8.0897762,
+      "lon": -34.9296939,
+      "referencia": "Av. Recife"
+    },
+    {
+      "id": "ufpe",
+      "nome": "UFPE (Av. Moraes Rego)",
+      "categoria": "Corredor de tráfego",
+      "efeito_ilha": null,
+      "lat": -8.0523299,
+      "lon": -34.9450681,
+      "referencia": "Av. Prof. Moraes Rego"
+    }
   ]
 }
