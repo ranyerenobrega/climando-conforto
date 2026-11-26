@@ -104,6 +104,9 @@ def main():
             with open(csv_local, "rb") as f:
                 novo = f.read()
             antigo = baixar(ftp, nome)
+            if antigo and antigo.split(b"\n", 1)[0].strip() != novo.split(b"\n", 1)[0].strip():
+                enviar_atomico(ftp, nome + ".esquema-anterior", antigo)  # colunas mudaram: preserva o antigo
+                antigo = None
             if antigo:
                 corpo = novo.split(b"\n", 1)[1] if b"\n" in novo else b""
                 if not antigo.endswith(b"\n"):

@@ -19,9 +19,15 @@ A página `conforto.html` lê os JSON; nenhuma chave de API fica no navegador. S
 3. Carga térmica: `CT = max(0, TA − 26)` (°C).
 4. Tempo por quilômetro: `t = 60 / max(v_atual, 5)` (min/km).
 5. Exposição: `E = CT · t` (°C·min/km).
-6. **IDTE_V2** = percentil de `E` entre as últimas 1000 coletas do próprio ponto (0 a 100). Aparece só com pelo menos 100 coletas ("em formação" antes). Classes: baixa (< P50), moderada (P50 a < P90), alta (≥ P90).
+6. **IDTE_V2** = percentil de `E` entre as últimas 1000 coletas do próprio ponto (0 a 100). Aparece só com pelo menos 100 coletas ("em formação" antes). Classes: baixa (< P50), moderada (P50 a < P90), alta (≥ P90 **e** carga térmica > 0).
+7. **Velocidade suavizada:** no passo 4 usa-se a mediana das últimas 3 leituras do ponto (`N_SUAVE`), para reduzir o ruído do tráfego. A velocidade bruta continua gravada.
+8. **Classe absoluta (independente do histórico):** índice de calor do NWS (Rothfusz, 1990) com temperatura e umidade, nas faixas ameno (< 26,7 °C), cautela, cautela extrema (≥ 32,2), perigo (≥ 39,4) e perigo extremo (≥ 51,7). Não considera vento nem radiação.
 
-Parâmetros no topo de `coletor.py`: `T_REF`, `V_MIN`, `N_JANELA`, `N_MIN`, `P_MEDIANA`, `P_ALTO`. São convenções, ainda sem validação de campo. O percentil é relativo ao histórico de cada ponto e não permite comparar pontos entre si; para isso use a exposição.
+Parâmetros no topo de `coletor.py`: `T_REF`, `V_MIN`, `N_JANELA`, `N_MIN`, `P_MEDIANA`, `P_ALTO`, `N_SUAVE`, `FAIXAS_IC`. São convenções, ainda sem validação de campo. O percentil é relativo ao histórico de cada ponto e não permite comparar pontos entre si; para isso use a exposição.
+
+## Atualização de esquema
+
+O `hist2_*.csv` ganhou colunas (`indice_calor`, `classe_abs`, `vel_suave`). Se o arquivo do dia no servidor tiver o cabeçalho antigo, `publicar_ftp.py` o guarda como `*.esquema-anterior` e começa um novo. Os `percentis_*.json` antigos continuam válidos (a mediana de velocidade começa vazia).
 
 ## Partida a frio
 
