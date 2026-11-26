@@ -1,26 +1,46 @@
-# Monitor de conforto térmico — Climando
+# TermoTrânsito (IDTE_V2)
 
-Coleta temperatura do ar e fluxo de tráfego por ponto, calcula o IDTE (A base metodológica vem do TCC de Davi Lopes da Costa, UFCG, 2026)
+Monitor de conforto térmico no trânsito, em tempo quase real, para Campina Grande (12 pontos) e Recife (14 pontos). Grupo TROPOCLIMA, UFCG.
 
 ## Como funciona
-GitHub Actions roda `coletor.py` e `publicar_ftp.py` a cada 15 min (05h–19h). Os arquivos chegam em `public_html/dados/` (`conforto_latest.json` e `hist_AAAA-MM-DD.csv`). A página `conforto.html` lê o JSON; nenhuma chave de API fica no navegador.
 
-## Antes de ligar
-1. **Pontos.** `pontos.json` já traz 12 pontos de Campina Grande (coordenadas do Google Places, em 23/11/2026). Quatro bairros (Prata, Serrotão, Três Irmãs, Alto Branco) usam o centroide, que pode cair em rua sem dado de tráfego. Rode uma vez `TOMTOM_KEY=... python coletor.py --verificar`: ele mostra a que trecho de via cada ponto foi associado, a distância, a classe da via e a confiança. Troque as coordenadas dos pontos que ficarem longe (centenas de metros) ou com confiança baixa.
-2. **Fator de Trânsito.** O TCC dá o intervalo (1,0–1,7), mas não a função. O coletor usa `vel_livre / vel_atual` limitado a esse intervalo (função `fator_transito`). Confira com o código do app e ajuste.
-3. **Corredores** (Alpargatas, Trauma, UFCG, UEPB) não têm coeficiente de ilha no TCC; aparecem sem índice até você definir um valor em `pontos.json`.
+GitHub Actions roda a cada 15 min (05h–19h, horário de Brasília) e executa, em ordem:
 
-## Publicar
-1. Crie um repositório no GitHub com estes arquivos (mantenha `.github/workflows/coletar.yml`). Repositório público não gasta minutos de Actions; em privado, o plano gratuito tem cota mensal (confira) e 15 min só de dia costuma caber.
-2. Em *Settings → Secrets and variables → Actions*, crie os segredos: `TOMTOM_KEY`, `FTP_HOST`, `FTP_USER`, `FTP_PASS`. Opcional: `OWM_KEY` e a variável `TEMP_FONTE=owm` para usar OpenWeatherMap no lugar do Open-Meteo.
-3. Variável opcional `FTP_DIR` (padrão `public_html/dados`) e `FTP_TLS=0` se o servidor não aceitar FTPS.
-4. Envie `conforto.html` para `public_html/` e troque o cabeçalho pelo menu das outras páginas do portal. O link no menu fica por sua conta.
-5. Rode o workflow à mão (*Actions → Coletar conforto térmico → Run workflow*) e confira `https://SEU-DOMINIO/dados/conforto_latest.json`.
+1. `publicar_ftp.py --baixar-estado`: traz do HostGator os arquivos `percentis_*.json` (janela móvel de exposição de cada ponto).
+2. `coletor.py`: consulta Open-Meteo (temperatura, umidade relativa e vento a 10 m) e TomTom (velocidade atual e de fluxo livre) e calcula o IDTE_V2.
+3. `publicar_ftp.py`: envia `conforto_latest.json`, `conforto_recife_latest.json`, os `percentis_*.json` e acrescenta as linhas do dia em `hist2_*.csv` (todos em `public_html/dados/`).
 
-## Teste local sem chaves
-`python coletor.py --simular` gera `saida/conforto_latest.json` com valores fictícios (a página mostra "dados de teste").
+A página `conforto.html` lê os JSON; nenhuma chave de API fica no navegador. Segredos e variáveis do GitHub são os mesmos de antes (`TOMTOM_KEY`, `FTP_HOST`, `FTP_USER`, `FTP_PASS`; opcionais `OWM_KEY`, `TEMP_FONTE`, `FTP_DIR`, `FTP_TLS`). Nada novo a configurar.
 
-## Atenção
-- Agendamentos do GitHub podem atrasar alguns minutos e, em repositório público, são desativados após 60 dias sem atividade no repositório.
-- Confira os termos de uso e de atribuição da TomTom e do Open-Meteo para dados exibidos publicamente.
-- A TomTom recomenda as APIs Orbis para novas integrações; o endpoint v4 usado aqui é a geração anterior.
+## Cálculo do IDTE_V2
+
+1. Pressão de vapor: `e = (UR/100) · 6,105 · exp(17,27·T / (237,7 + T))` (hPa).
+2. Temperatura aparente (Steadman, sem radiação): `TA = T + 0,33·e − 0,70·w − 4,00` (w = vento a 10 m, m/s).
+3. Carga térmica: `CT = max(0, TA − 26)` (°C).
+4. Tempo por quilômetro: `t = 60 / max(v_atual, 5)` (min/km).
+5. Exposição: `E = CT · t` (°C·min/km).
+6. **IDTE_V2** = percentil de `E` entre as últimas 1000 coletas do próprio ponto (0 a 100). Aparece só com pelo menos 100 coletas ("em formação" antes). Classes: baixa (< P50), moderada (P50 a < P90), alta (≥ P90).
+
+Parâmetros no topo de `coletor.py`: `T_REF`, `V_MIN`, `N_JANELA`, `N_MIN`, `P_MEDIANA`, `P_ALTO`. São convenções, ainda sem validação de campo. O percentil é relativo ao histórico de cada ponto e não permite comparar pontos entre si; para isso use a exposição.
+
+## Partida a frio
+
+O histórico antigo (`hist_*.csv`) não tem umidade nem vento e não é usado. Os percentis começam do zero no primeiro dia; com 60 coletas por dia, cada ponto passa a exibir o índice em cerca de 2 dias. A janela é guardada em `percentis_*.json` no servidor; se esse arquivo for apagado, o processo recomeça.
+
+## Arquivos
+
+- `pontos.json` (Campina Grande) e `pontos_recife.json` (Recife): id, nome, categoria, coordenadas. Os campos `efeito_ilha` não são mais usados.
+- `coletor.py`: `--cidade campina|recife`, `--simular` (testa sem APIs), `--verificar` (mostra o trecho de via que a TomTom associou a cada ponto).
+- `.github/workflows/coletar.yml` (coleta) e `verificar.yml` (manual).
+
+## Teste local
+
+```
+python coletor.py --simular    # repita 101 vezes para ver o percentil aparecer
+```
+
+Apague a pasta `saida/` depois do teste para não publicar o estado simulado.
+
+## Contraste de superfície (Landsat)
+
+Informação complementar, fixa, embutida em `conforto.html` (constante `LST`, mostrada no popup). Não entra no índice. Para atualizar, rode `resumir_lst.py` sobre os CSV exportados do Google Earth Engine (`termotransito_lst_landsat_gee.js`) e cole o novo objeto em `LST`.

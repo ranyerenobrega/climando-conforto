@@ -1,23 +1,35 @@
 #!/usr/bin/env python3
-"""Coletor do Monitor de Conforto Térmico do Climando.
+"""TermoTrânsito: coletor do monitor de conforto térmico no trânsito (IDTE_V2).
 
-Para cada ponto de pontos.json consulta:
-  - temperatura do ar (Open-Meteo por padrão; OpenWeatherMap se TEMP_FONTE=owm)
+Para cada ponto de pontos*.json consulta
+  - temperatura, umidade relativa e vento a 10 m (Open-Meteo; OpenWeatherMap se TEMP_FONTE=owm)
   - velocidade atual e de fluxo livre do trecho mais próximo (TomTom Flow Segment Data)
-e calcula o Índice de Desconforto Térmico Estimado (IDTE), conforme o TCC de Davi Lopes
-da Costa (UFCG, 2026), com uma diferença: o resultado é truncado entre 0 e 100.
+e calcula o IDTE_V2 (Índice de Desconforto Térmico Estimado, versão 2):
 
-Saídas (pasta saida/), uma por cidade (ver CIDADES):
-  conforto_latest.json         estado atual, lido pela página conforto.html
-  hist_AAAA-MM-DD.csv          linhas desta coleta (o publicar_ftp.py junta com as anteriores)
+  1. Temperatura aparente (Steadman, 1994, sem radiação):
+        e  = (UR/100) * 6,105 * exp(17,27 T / (237,7 + T))         [hPa]
+        TA = T + 0,33 e - 0,70 w - 4,00                             [°C; w = vento a 10 m, m/s]
+  2. Carga térmica:      CT = max(0, TA - T_REF)                      [°C]   (T_REF = 26 °C)
+  3. Tempo no trecho:    t  = 60 / max(v_atual, V_MIN)                [min/km]
+  4. Exposição térmica:  E  = CT * t                                  [°C·min/km]
+  5. IDTE_V2 = percentil de E na janela móvel das últimas N_JANELA coletas do próprio ponto (0-100).
+     Só é exibido quando o ponto já tem N_MIN coletas na janela ("em formação" antes disso).
 
-Variáveis de ambiente: TOMTOM_KEY (obrigatória, exceto com --simular),
-OWM_KEY (só se TEMP_FONTE=owm), TEMP_FONTE (openmeteo | owm).
-Só usa a biblioteca padrão do Python.
+Classes (relativas ao histórico do ponto): baixa (< P50), moderada (P50 a < P90), alta (>= P90).
+
+Saídas (pasta saida/), por cidade:
+  conforto_latest.json / conforto_recife_latest.json   estado atual, lido pela página
+  hist2_AAAA-MM-DD.csv / hist2_recife_AAAA-MM-DD.csv   linhas desta coleta (publicar_ftp.py junta)
+  percentis_<cidade>.json                              janela móvel de E por ponto (estado do percentil)
+
+O estado dos percentis é baixado do servidor antes da coleta (publicar_ftp.py --baixar-estado)
+e enviado de volta depois. Só usa a biblioteca padrão do Python.
+Variáveis de ambiente: TOMTOM_KEY (exceto com --simular), OWM_KEY (se TEMP_FONTE=owm), TEMP_FONTE.
 """
 import argparse
 import csv
 import json
+import math
 import os
 import random
 import sys
@@ -25,134 +37,162 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-FUSO = timezone(timedelta(hours=-3))  # Paraíba: UTC-3, sem horário de verão
+FUSO = timezone(timedelta(hours=-3))  # UTC-3, sem horário de verão
 AQUI = os.path.dirname(os.path.abspath(__file__))
 SAIDA = os.path.join(AQUI, "saida")
 
-# Cidades monitoradas: arquivo de pontos, arquivo de saída e prefixo do histórico.
 CIDADES = {
-    "campina": {"pontos": "pontos.json", "latest": "conforto_latest.json", "hist": "hist"},
-    "recife": {"pontos": "pontos_recife.json", "latest": "conforto_recife_latest.json", "hist": "hist_recife"},
+    "campina": {"pontos": "pontos.json", "latest": "conforto_latest.json", "hist": "hist2",
+                "estado": "percentis_campina.json"},
+    "recife": {"pontos": "pontos_recife.json", "latest": "conforto_recife_latest.json", "hist": "hist2_recife",
+               "estado": "percentis_recife.json"},
 }
 
-T_REFERENCIA = 25.0   # °C, neutralidade (TCC, Eq. 2)
-PESO = 8.0            # fator de ponderação empírico (TCC, Eq. 2)
-FT_MIN, FT_MAX = 1.0, 1.7  # intervalo do Fator de Trânsito (TCC, item 3.3)
-LIMIAR_INICIAL, LIMIAR_ELEVADO = 45.0, 75.0  # TCC, Quadro 1
+T_REF = 26.0      # °C: limite superior da faixa "sem estresse térmico" do UTCI (BRÖDE et al., 2012); referência convencional
+V_MIN = 5.0       # km/h: piso da velocidade, evita tempo de percurso explosivo em trânsito parado
+N_JANELA = 1000   # coletas guardadas por ponto (~17 dias a 60 coletas/dia)
+N_MIN = 100       # coletas mínimas para exibir o percentil (~2 dias)
+P_MEDIANA, P_ALTO = 50.0, 90.0
 
 
 def get_json(url, timeout=15):
-    req = urllib.request.Request(url, headers={"User-Agent": "climando-conforto/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "termotransito/2.0"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.loads(r.read().decode("utf-8"))
 
 
-def temperatura_openmeteo(lat, lon):
+def clima_openmeteo(lat, lon):
     q = urllib.parse.urlencode({
-        "latitude": lat, "longitude": lon,
-        "current": "temperature_2m", "timezone": "America/Fortaleza",
+        "latitude": lat, "longitude": lon, "timezone": "America/Fortaleza", "wind_speed_unit": "ms",
+        "current": "temperature_2m,relative_humidity_2m,wind_speed_10m",
     })
-    d = get_json("https://api.open-meteo.com/v1/forecast?" + q)
-    return float(d["current"]["temperature_2m"])
+    c = get_json("https://api.open-meteo.com/v1/forecast?" + q)["current"]
+    return float(c["temperature_2m"]), float(c["relative_humidity_2m"]), float(c["wind_speed_10m"])
 
 
-def temperatura_owm(lat, lon, chave):
+def clima_owm(lat, lon, chave):
     q = urllib.parse.urlencode({"lat": lat, "lon": lon, "units": "metric", "appid": chave})
     d = get_json("https://api.openweathermap.org/data/2.5/weather?" + q)
-    return float(d["main"]["temp"])
+    return float(d["main"]["temp"]), float(d["main"]["humidity"]), float(d["wind"]["speed"])
 
 
 def trafego_tomtom(lat, lon, chave):
     q = urllib.parse.urlencode({"key": chave, "point": f"{lat},{lon}", "unit": "KMPH"})
     d = get_json("https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?" + q)
     f = d["flowSegmentData"]
-    return {
-        "vel_atual": float(f["currentSpeed"]),
-        "vel_livre": float(f["freeFlowSpeed"]),
-        "confianca": f.get("confidence"),
-        "via_fechada": bool(f.get("roadClosure", False)),
-    }
+    return {"vel_atual": float(f["currentSpeed"]), "vel_livre": float(f["freeFlowSpeed"]),
+            "confianca": f.get("confidence")}
 
 
-def fator_transito(vel_atual, vel_livre):
-    """Razão vel_livre/vel_atual limitada a [1,0 ; 1,7].
-
-    ATENÇÃO: o TCC informa o intervalo, mas não a função que leva a velocidade ao fator.
-    Esta razão é uma suposição; confira com o código do app original e ajuste aqui.
-    """
-    if not vel_atual or vel_atual <= 0 or not vel_livre:
-        return None
-    return round(min(FT_MAX, max(FT_MIN, vel_livre / vel_atual)), 2)
+# ---------- cálculo do IDTE_V2 ----------
+def temperatura_aparente(t, ur, vento):
+    e = (ur / 100.0) * 6.105 * math.exp(17.27 * t / (237.7 + t))
+    return t + 0.33 * e - 0.70 * vento - 4.00
 
 
-def calcular_idte(temp_ar, efeito_ilha, ft):
-    temp_ajustada = temp_ar + efeito_ilha          # Eq. 1 do TCC
-    bruto = (temp_ajustada - T_REFERENCIA) * PESO * ft  # Eq. 2 do TCC
-    return round(temp_ajustada, 1), round(bruto, 1), round(min(100.0, max(0.0, bruto)), 1)
+def exposicao(ta, vel_atual, vel_livre):
+    """Devolve (carga térmica °C, tempo min/km, atraso min/km, exposição °C·min/km)."""
+    ct = max(0.0, ta - T_REF)
+    t_km = 60.0 / max(vel_atual, V_MIN)
+    atraso = max(0.0, t_km - 60.0 / max(vel_livre, V_MIN)) if vel_livre else None
+    return ct, t_km, atraso, ct * t_km
 
 
-def classificar(valor):
-    if valor is None:
-        return "sem_indice"
-    if valor < LIMIAR_INICIAL:
-        return "conforto"
-    if valor < LIMIAR_ELEVADO:
-        return "desconforto_inicial"
-    return "desconforto_elevado"
+def percentil(valor, janela):
+    """Posição percentual (0-100) de valor entre os da janela; empates contam metade."""
+    n = len(janela)
+    abaixo = sum(1 for x in janela if x < valor)
+    iguais = sum(1 for x in janela if x == valor)
+    return 100.0 * (abaixo + 0.5 * iguais) / n
 
 
-def coletar_ponto(p, args, chave_tt, chave_owm):
+def classificar(p):
+    if p is None:
+        return "em_formacao"
+    return "baixa" if p < P_MEDIANA else ("moderada" if p < P_ALTO else "alta")
+
+
+# ---------- estado dos percentis ----------
+def carregar_estado(cfg):
+    caminho = os.path.join(SAIDA, cfg["estado"])
+    if os.path.exists(caminho):
+        try:
+            with open(caminho, encoding="utf-8") as f:
+                return json.load(f).get("pontos", {})
+        except (OSError, ValueError):
+            print(f"aviso: {cfg['estado']} ilegível; recomeçando o histórico de percentis")
+    return {}
+
+
+def salvar_estado(cfg, estado, agora):
+    os.makedirs(SAIDA, exist_ok=True)
+    doc = {"versao": 2, "atualizado_em": agora.isoformat(timespec="seconds"),
+           "n_janela": N_JANELA, "pontos": estado}
+    with open(os.path.join(SAIDA, cfg["estado"]), "w", encoding="utf-8") as f:
+        json.dump(doc, f, separators=(",", ":"))
+
+
+def coletar_ponto(p, args, chave_tt, chave_owm, estado):
     out = {
         "id": p["id"], "nome": p["nome"], "categoria": p.get("categoria"),
-        "lat": p.get("lat"), "lon": p.get("lon"), "efeito_ilha": p.get("efeito_ilha"),
-        "temp_ar": None, "temp_ajustada": None, "vel_atual": None, "vel_livre": None,
-        "fator_transito": None, "confianca": None, "idte_bruto": None, "idte": None,
-        "classe": "sem_indice", "status": "ok", "erros": [],
+        "lat": p.get("lat"), "lon": p.get("lon"),
+        "temp_ar": None, "umidade": None, "vento": None, "temp_aparente": None,
+        "vel_atual": None, "vel_livre": None, "atraso_min_km": None, "carga_termica": None,
+        "exposicao": None, "idte_v2": None, "classe": "em_formacao", "n_amostras": 0,
+        "confianca": None, "status": "ok", "erros": [],
     }
+    clima = tt = None
     if args.simular:
         out["lat"] = out["lat"] or -7.23
         out["lon"] = out["lon"] or -35.88
-        t = round(random.uniform(24, 33), 1)
+        clima = (round(random.uniform(24, 33), 1), round(random.uniform(50, 90)), round(random.uniform(0.5, 5), 1))
         livre = random.choice([40, 50, 60])
-        atual = round(livre / random.uniform(1.0, 1.9), 0)
-        tt = {"vel_atual": atual, "vel_livre": float(livre), "confianca": 0.9, "via_fechada": False}
+        tt = {"vel_atual": float(round(livre / random.uniform(1.0, 2.5))), "vel_livre": float(livre), "confianca": 0.9}
     else:
         if out["lat"] is None or out["lon"] is None:
             out["status"] = "sem_coordenadas"
-            out["erros"].append("lat/lon ausentes em pontos.json")
+            out["erros"].append("lat/lon ausentes")
             return out
-        t, tt = None, None
         try:
             fonte = os.environ.get("TEMP_FONTE", "openmeteo").lower()
-            t = (temperatura_owm(out["lat"], out["lon"], chave_owm) if fonte == "owm"
-                 else temperatura_openmeteo(out["lat"], out["lon"]))
-        except Exception as e:  # noqa: BLE001 - registra e segue para o próximo ponto
-            out["erros"].append(f"temperatura: {e}")
+            clima = (clima_owm(out["lat"], out["lon"], chave_owm) if fonte == "owm"
+                     else clima_openmeteo(out["lat"], out["lon"]))
+        except Exception as e:  # noqa: BLE001
+            out["erros"].append(f"clima: {e}")
         try:
             tt = trafego_tomtom(out["lat"], out["lon"], chave_tt)
         except Exception as e:  # noqa: BLE001
             out["erros"].append(f"trafego: {e}")
 
-    out["temp_ar"] = t
+    if clima:
+        out["temp_ar"], out["umidade"], out["vento"] = clima
+        out["temp_aparente"] = round(temperatura_aparente(*clima), 1)
     if tt:
-        out["vel_atual"], out["vel_livre"] = tt["vel_atual"], tt["vel_livre"]
-        out["confianca"] = tt["confianca"]
-        out["fator_transito"] = fator_transito(tt["vel_atual"], tt["vel_livre"])
+        out["vel_atual"], out["vel_livre"], out["confianca"] = tt["vel_atual"], tt["vel_livre"], tt["confianca"]
 
-    ef, ft = out["efeito_ilha"], out["fator_transito"]
-    if t is not None and ef is not None and ft is not None:
-        out["temp_ajustada"], out["idte_bruto"], out["idte"] = calcular_idte(t, ef, ft)
-    out["classe"] = classificar(out["idte"])
+    janela = estado.setdefault(p["id"], [])
+    out["n_amostras"] = len(janela)
+    if clima and tt:
+        ct, _, atraso, e = exposicao(out["temp_aparente"], tt["vel_atual"], tt["vel_livre"])
+        out["carga_termica"] = round(ct, 1)
+        out["atraso_min_km"] = None if atraso is None else round(atraso, 2)
+        out["exposicao"] = round(e, 1)
+        if len(janela) >= N_MIN:  # compara com o passado antes de acrescentar o valor atual
+            out["idte_v2"] = round(percentil(out["exposicao"], janela), 1)
+        out["classe"] = classificar(out["idte_v2"])
+        janela.append(out["exposicao"])
+        del janela[:-N_JANELA]
+    elif not out["erros"]:
+        out["erros"].append("dados incompletos")
     if out["erros"]:
-        out["status"] = "parcial" if (t is not None or tt) else "falha"
+        out["status"] = "parcial" if (clima or tt) else "falha"
     return out
 
 
 def distancia_m(lat1, lon1, lat2, lon2):
-    from math import asin, cos, radians, sin, sqrt
-    a = (sin(radians(lat2 - lat1) / 2) ** 2
-         + cos(radians(lat1)) * cos(radians(lat2)) * sin(radians(lon2 - lon1) / 2) ** 2)
-    return 2 * 6371000 * asin(sqrt(a))
+    a = (math.sin(math.radians(lat2 - lat1) / 2) ** 2
+         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(math.radians(lon2 - lon1) / 2) ** 2)
+    return 2 * 6371000 * math.asin(math.sqrt(a))
 
 
 def verificar(pontos, chave):
@@ -174,37 +214,32 @@ def verificar(pontos, chave):
 
 
 def processar_cidade(chave, cfg, args, chave_tt, chave_owm, agora):
-    """Coleta uma cidade, grava saida/<latest> e o CSV do dia. Devolve (pontos ok, total)."""
     with open(os.path.join(AQUI, cfg["pontos"]), encoding="utf-8") as f:
         pontos = json.load(f)["pontos"]
-    resultados = [coletar_ponto(p, args, chave_tt, chave_owm) for p in pontos]
+    estado = carregar_estado(cfg)
+    resultados = [coletar_ponto(p, args, chave_tt, chave_owm, estado) for p in pontos]
     ok = sum(1 for r in resultados if r["status"] == "ok")
     if ok == 0 and not args.simular:
-        print(f"{chave}: nenhum ponto válido; arquivo não atualizado")
+        print(f"{chave}: nenhum ponto válido; arquivos não atualizados")
         for r in resultados[:3]:
             print(f"  - {r['id']}: {'; '.join(r['erros'])}")
         return 0, len(resultados)
 
     os.makedirs(SAIDA, exist_ok=True)
-    doc = {
-        "versao": 1,
-        "cidade": chave,
-        "gerado_em": agora.isoformat(timespec="seconds"),
-        "simulado": bool(args.simular),
-        "pontos": resultados,
-    }
+    doc = {"versao": 2, "cidade": chave, "gerado_em": agora.isoformat(timespec="seconds"),
+           "simulado": bool(args.simular), "n_min": N_MIN, "n_janela": N_JANELA, "pontos": resultados}
     with open(os.path.join(SAIDA, cfg["latest"]), "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, indent=1)
+    salvar_estado(cfg, estado, agora)
 
-    caminho_csv = os.path.join(SAIDA, f"{cfg['hist']}_{agora:%Y-%m-%d}.csv")
-    with open(caminho_csv, "w", encoding="utf-8", newline="") as f:
+    with open(os.path.join(SAIDA, f"{cfg['hist']}_{agora:%Y-%m-%d}.csv"), "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["data_hora", "id", "temp_ar", "vel_atual", "vel_livre",
-                    "fator_transito", "idte_bruto", "idte", "classe", "status"])
+        w.writerow(["data_hora", "id", "temp_ar", "umidade", "vento_ms", "temp_aparente", "vel_atual", "vel_livre",
+                    "atraso_min_km", "carga_termica", "exposicao", "idte_v2", "classe", "n_amostras", "status"])
         for r in resultados:
-            w.writerow([agora.isoformat(timespec="seconds"), r["id"], r["temp_ar"], r["vel_atual"],
-                        r["vel_livre"], r["fator_transito"], r["idte_bruto"], r["idte"],
-                        r["classe"], r["status"]])
+            w.writerow([agora.isoformat(timespec="seconds"), r["id"], r["temp_ar"], r["umidade"], r["vento"],
+                        r["temp_aparente"], r["vel_atual"], r["vel_livre"], r["atraso_min_km"], r["carga_termica"],
+                        r["exposicao"], r["idte_v2"], r["classe"], r["n_amostras"], r["status"]])
 
     print(f"{agora:%H:%M} {chave}: {ok}/{len(resultados)} pontos ok")
     for r in resultados:
@@ -215,19 +250,16 @@ def processar_cidade(chave, cfg, args, chave_tt, chave_owm, agora):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--cidade", default="todas", choices=["todas"] + list(CIDADES),
-                    help="cidade a coletar (padrão: todas)")
+    ap.add_argument("--cidade", default="todas", choices=["todas"] + list(CIDADES))
     ap.add_argument("--verificar", action="store_true", help="mostra o trecho de via associado a cada ponto e sai")
     ap.add_argument("--simular", action="store_true", help="não chama APIs; gera valores fictícios para teste")
     args = ap.parse_args()
 
-    chave_tt = os.environ.get("TOMTOM_KEY", "")
-    chave_owm = os.environ.get("OWM_KEY", "")
+    chave_tt, chave_owm = os.environ.get("TOMTOM_KEY", ""), os.environ.get("OWM_KEY", "")
     if not args.simular and not chave_tt:
         sys.exit("Defina TOMTOM_KEY (ou use --simular).")
     if os.environ.get("TEMP_FONTE", "openmeteo").lower() == "owm" and not chave_owm and not args.simular:
         sys.exit("TEMP_FONTE=owm exige OWM_KEY.")
-
     escolhidas = list(CIDADES) if args.cidade == "todas" else [args.cidade]
 
     if args.verificar:
@@ -238,12 +270,9 @@ def main():
         return
 
     agora = datetime.now(FUSO)
-    total_ok = 0
-    for c in escolhidas:
-        ok, _ = processar_cidade(c, CIDADES[c], args, chave_tt, chave_owm, agora)
-        total_ok += ok
+    total_ok = sum(processar_cidade(c, CIDADES[c], args, chave_tt, chave_owm, agora)[0] for c in escolhidas)
     if total_ok == 0 and not args.simular:
-        sys.exit(1)  # nada válido em nenhuma cidade: não publica
+        sys.exit(1)
 
 
 if __name__ == "__main__":
