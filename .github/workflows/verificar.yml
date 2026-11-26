@@ -1,0 +1,19 @@
+name: Verificar pontos (manual)
+
+# Roda uma vez, à mão: mostra a que trecho de via a TomTom associou cada ponto.
+on:
+  workflow_dispatch:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verificar pontos
+        env:
+          TOMTOM_KEY: ${{ secrets.TOMTOM_KEY }}
+        run: python coletor.py --verificar

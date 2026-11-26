@@ -1,4 +1,4 @@
-name: Coletar conforto térmico
+name: TermoTrânsito - coletar dados
 
 on:
   schedule:
@@ -22,7 +22,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Coletar dados
+      - name: Baixar estado dos percentis (HostGator)
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+          FTP_DIR: ${{ vars.FTP_DIR || 'public_html/dados' }}
+          FTP_TLS: ${{ vars.FTP_TLS || '1' }}
+        run: python publicar_ftp.py --baixar-estado
+
+      - name: Coletar dados (IDTE_V2)
         env:
           TOMTOM_KEY: ${{ secrets.TOMTOM_KEY }}
           OWM_KEY: ${{ secrets.OWM_KEY }}
