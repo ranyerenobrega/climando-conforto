@@ -6,6 +6,13 @@ Para cada ponto de pontos*.json consulta
   - velocidade atual e de fluxo livre do trecho mais próximo (TomTom Flow Segment Data)
 e calcula o IDTE_V2 (Índice de Desconforto Térmico Estimado, versão 2):
 
+  0. Temperatura ajustada: T_aj = T + K_LST * dt_lst, em que dt_lst é o contraste mediano de temperatura de
+     superfície do ponto (Landsat, pontos*.json) em relação à referência (Embrapa; Parque da Jaqueira) e K_LST
+     (padrão 0,25) é o fator que converte contraste de superfície em contraste do ar. K_LST NÃO foi calibrado.
+  0. Temperatura ajustada: T_aj = T + K_LST * dt_lst, em que dt_lst é o contraste mediano de temperatura de
+     superfície do ponto (Landsat, em pontos*.json) em relação à referência (Embrapa; Parque da Jaqueira) e
+     K_LST (padrão 0,25; variável de ambiente K_LST) converte contraste de superfície em contraste do ar.
+     K_LST NÃO foi calibrado. Sem contraste válido (ou na própria referência), dt_lst = 0.
   1. Temperatura aparente (Steadman, 1994, sem radiação):
         e  = (UR/100) * 6,105 * exp(17,27 T / (237,7 + T))         [hPa]
         TA = T + 0,33 e - 0,70 w - 4,00                             [°C; w = vento a 10 m, m/s]
@@ -55,6 +62,7 @@ CIDADES = {
                "estado": "percentis_recife.json"},
 }
 
+K_LST = float(os.environ.get("K_LST", "0.25"))  # fator superfície -> ar (não calibrado)
 T_REF = 26.0      # °C: limite superior da faixa "sem estresse térmico" do UTCI (BRÖDE et al., 2012); referência convencional
 V_MIN = 5.0       # km/h: piso da velocidade, evita tempo de percurso explosivo em trânsito parado
 N_JANELA = 1000   # coletas guardadas por ponto (~17 dias a 60 coletas/dia)
@@ -155,6 +163,9 @@ def carregar_estado(cfg):
         try:
             with open(caminho, encoding="utf-8") as f:
                 d = json.load(f)
+                if d.get("versao") != 3:  # exposição passou a usar a temperatura ajustada: janela antiga não é comparável
+                    print(f"aviso: {cfg['estado']} é de versão anterior; recomeçando a janela de percentis")
+                    return {}, {}
                 return d.get("pontos", {}), d.get("velocidades", {})
         except (OSError, ValueError):
             print(f"aviso: {cfg['estado']} ilegível; recomeçando o histórico de percentis")
@@ -163,7 +174,7 @@ def carregar_estado(cfg):
 
 def salvar_estado(cfg, estado, vels, agora):
     os.makedirs(SAIDA, exist_ok=True)
-    doc = {"versao": 2, "atualizado_em": agora.isoformat(timespec="seconds"),
+    doc = {"versao": 3, "atualizado_em": agora.isoformat(timespec="seconds"),
            "n_janela": N_JANELA, "pontos": estado, "velocidades": vels}
     with open(os.path.join(SAIDA, cfg["estado"]), "w", encoding="utf-8") as f:
         json.dump(doc, f, separators=(",", ":"))
@@ -173,7 +184,7 @@ def coletar_ponto(p, args, chave_tt, chave_owm, estado, vels):
     out = {
         "id": p["id"], "nome": p["nome"], "categoria": p.get("categoria"),
         "lat": p.get("lat"), "lon": p.get("lon"),
-        "temp_ar": None, "umidade": None, "vento": None, "temp_aparente": None,
+        "temp_ar": None, "temp_ajustada": None, "dt_lst": p.get("dt_lst", 0.0), "dt_lst_n": p.get("dt_lst_n", 0), "ajuste_lst": None, "umidade": None, "vento": None, "temp_aparente": None,
         "indice_calor": None, "classe_abs": None, "vel_suave": None,
         "vel_atual": None, "vel_livre": None, "atraso_min_km": None, "carga_termica": None,
         "exposicao": None, "idte_v2": None, "classe": "em_formacao", "n_amostras": 0,
@@ -204,8 +215,11 @@ def coletar_ponto(p, args, chave_tt, chave_owm, estado, vels):
 
     if clima:
         out["temp_ar"], out["umidade"], out["vento"] = clima
-        out["temp_aparente"] = round(temperatura_aparente(*clima), 1)
-        ic, out["classe_abs"] = indice_calor(clima[0], clima[1])
+        out["ajuste_lst"] = round(K_LST * (p.get("dt_lst") or 0.0), 2)
+        t_aj = clima[0] + out["ajuste_lst"]
+        out["temp_ajustada"] = round(t_aj, 1)
+        out["temp_aparente"] = round(temperatura_aparente(t_aj, clima[1], clima[2]), 1)
+        ic, out["classe_abs"] = indice_calor(t_aj, clima[1])
         out["indice_calor"] = round(ic, 1)
     if tt:
         out["vel_atual"], out["vel_livre"], out["confianca"] = tt["vel_atual"], tt["vel_livre"], tt["confianca"]
@@ -270,7 +284,7 @@ def processar_cidade(chave, cfg, args, chave_tt, chave_owm, agora):
         return 0, len(resultados)
 
     os.makedirs(SAIDA, exist_ok=True)
-    doc = {"versao": 2, "cidade": chave, "gerado_em": agora.isoformat(timespec="seconds"),
+    doc = {"versao": 3, "k_lst": K_LST, "cidade": chave, "gerado_em": agora.isoformat(timespec="seconds"),
            "simulado": bool(args.simular), "n_min": N_MIN, "n_janela": N_JANELA, "pontos": resultados}
     with open(os.path.join(SAIDA, cfg["latest"]), "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, indent=1)
@@ -278,10 +292,10 @@ def processar_cidade(chave, cfg, args, chave_tt, chave_owm, agora):
 
     with open(os.path.join(SAIDA, f"{cfg['hist']}_{agora:%Y-%m-%d}.csv"), "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["data_hora", "id", "temp_ar", "umidade", "vento_ms", "temp_aparente", "indice_calor", "classe_abs", "vel_atual", "vel_suave", "vel_livre",
+        w.writerow(["data_hora", "id", "temp_ar", "ajuste_lst", "temp_ajustada", "umidade", "vento_ms", "temp_aparente", "indice_calor", "classe_abs", "vel_atual", "vel_suave", "vel_livre",
                     "atraso_min_km", "carga_termica", "exposicao", "idte_v2", "classe", "n_amostras", "status"])
         for r in resultados:
-            w.writerow([agora.isoformat(timespec="seconds"), r["id"], r["temp_ar"], r["umidade"], r["vento"],
+            w.writerow([agora.isoformat(timespec="seconds"), r["id"], r["temp_ar"], r["ajuste_lst"], r["temp_ajustada"], r["umidade"], r["vento"],
                         r["temp_aparente"], r["indice_calor"], r["classe_abs"], r["vel_atual"], r["vel_suave"], r["vel_livre"], r["atraso_min_km"], r["carga_termica"],
                         r["exposicao"], r["idte_v2"], r["classe"], r["n_amostras"], r["status"]])
 

@@ -14,6 +14,7 @@ A página `conforto.html` lê os JSON; nenhuma chave de API fica no navegador. S
 
 ## Cálculo do IDTE_V2
 
+0. **Temperatura ajustada:** `T_aj = T + K_LST · dt_lst`. `dt_lst` é o contraste mediano de temperatura de superfície do ponto (Landsat 8/9, 2014–2025) em relação à referência (Embrapa em Campina Grande; Parque da Jaqueira em Recife), gravado em `pontos*.json`. `K_LST` = 0,25 (variável de ambiente `K_LST`, ou `vars.K_LST` no workflow se você quiser expô-la): converte contraste de superfície em contraste do ar e **não foi calibrado**. Pontos sem contraste e a referência têm `dt_lst` = 0. Nos passos seguintes, `T` é `T_aj`.
 1. Pressão de vapor: `e = (UR/100) · 6,105 · exp(17,27·T / (237,7 + T))` (hPa).
 2. Temperatura aparente (Steadman, sem radiação): `TA = T + 0,33·e − 0,70·w − 4,00` (w = vento a 10 m, m/s).
 3. Carga térmica: `CT = max(0, TA − 26)` (°C).
@@ -27,7 +28,7 @@ Parâmetros no topo de `coletor.py`: `T_REF`, `V_MIN`, `N_JANELA`, `N_MIN`, `P_M
 
 ## Atualização de esquema
 
-O `hist2_*.csv` ganhou colunas (`indice_calor`, `classe_abs`, `vel_suave`). Se o arquivo do dia no servidor tiver o cabeçalho antigo, `publicar_ftp.py` o guarda como `*.esquema-anterior` e começa um novo. Os `percentis_*.json` antigos continuam válidos (a mediana de velocidade começa vazia).
+O `hist2_*.csv` ganhou colunas (`ajuste_lst`, `temp_ajustada`, `indice_calor`, `classe_abs`, `vel_suave`). Se o arquivo do dia no servidor tiver o cabeçalho antigo, `publicar_ftp.py` o guarda como `*.esquema-anterior` e começa um novo. Os `percentis_*.json` de versão anterior são descartados automaticamente (a exposição passou a usar a temperatura ajustada) e a janela recomeça, com nova fase "em formação" de cerca de 2 dias.
 
 ## Partida a frio
 
@@ -35,7 +36,7 @@ O histórico antigo (`hist_*.csv`) não tem umidade nem vento e não é usado. O
 
 ## Arquivos
 
-- `pontos.json` (Campina Grande) e `pontos_recife.json` (Recife): id, nome, categoria, coordenadas. Os campos `efeito_ilha` não são mais usados.
+- `pontos.json` (Campina Grande) e `pontos_recife.json` (Recife): id, nome, categoria, coordenadas, `dt_lst` e `dt_lst_n` (contraste de superfície e número de datas). Para atualizar o contraste, rode `resumir_lst.py` e copie os valores.
 - `coletor.py`: `--cidade campina|recife`, `--simular` (testa sem APIs), `--verificar` (mostra o trecho de via que a TomTom associou a cada ponto).
 - `.github/workflows/coletar.yml` (coleta) e `verificar.yml` (manual).
 
