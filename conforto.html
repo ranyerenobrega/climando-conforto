@@ -4,18 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#22475A">
-<title>Conforto térmico no trânsito de Campina Grande | Climando</title>
-<meta name="description" content="Estimativa do desconforto térmico no trânsito de Campina Grande-PB, atualizada a cada 15 minutos a partir de temperatura do ar e fluxo de tráfego.">
+<title>TermoTrânsito: conforto térmico no trânsito | Climando</title>
+<meta name="description" content="Estimativa do desconforto térmico no trânsito de Campina Grande-PB e Recife-PE, atualizada a cada 15 minutos a partir de temperatura aparente (temperatura, umidade e vento) e fluxo de tráfego.">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   :root { --azul:#22475A; --quente:#E4572E; --areia:#FBF4EA; --texto:#2b2b2b; --cinza:#6b7280;
-          --verde:#2e9e4f; --amarelo:#e0a100; --vermelho:#d64545; --neutro:#8a8f98; }
+          --verde:#2e9e4f; --amarelo:#e0a100; --vermelho:#d64545; --neutro:#8a8f98; --laranja:#e86f1c; --vinho:#8e1b1b; }
   * { box-sizing:border-box; }
   body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:var(--texto); background:var(--areia); line-height:1.5; }
   /* Substitua este bloco pelo cabeçalho/menu das outras páginas do Climando */
   header.topo { background:var(--azul); color:#fff; padding:14px 18px; }
   header.topo a { color:#fff; text-decoration:none; font-weight:600; }
   main { max-width:1100px; margin:0 auto; padding:18px; }
+  .seletor { display:inline-flex; border:1px solid var(--azul); border-radius:999px; overflow:hidden; margin:.2rem 0 .6rem; }
+  .seletor button { font:inherit; font-weight:600; padding:7px 18px; border:0; background:#fff; color:var(--azul); cursor:pointer; }
+  .seletor button[aria-pressed="true"] { background:var(--azul); color:#fff; }
+  .seletor button:focus-visible { outline:3px solid var(--quente); outline-offset:-3px; }
+  .nota-cidade { background:#fff8e1; border:1px solid #ecd9a0; border-radius:10px; padding:8px 12px; font-size:.88rem; margin:.4rem 0 .8rem; }
   h1 { font-size:1.5rem; margin:.2rem 0 .3rem; color:var(--azul); }
   .sub { color:var(--cinza); margin:0 0 .8rem; }
   #status { display:inline-block; padding:4px 10px; border-radius:999px; font-size:.85rem; background:#e7f3ea; color:#1d6b37; }
@@ -24,9 +29,14 @@
   #mapa { height:520px; border-radius:12px; border:1px solid #e5d9c6; }
   #lista { display:flex; flex-direction:column; gap:8px; max-height:520px; overflow:auto; }
   .cartao { background:#fff; border:1px solid #e5d9c6; border-left:6px solid var(--neutro); border-radius:10px; padding:10px 12px; cursor:pointer; }
-  .cartao.conforto { border-left-color:var(--verde); }
-  .cartao.desconforto_inicial { border-left-color:var(--amarelo); }
-  .cartao.desconforto_elevado { border-left-color:var(--vermelho); }
+  .cartao.abs_confortavel { border-left-color:var(--verde); }
+  .cartao.abs_leve { border-left-color:var(--amarelo); }
+  .cartao.abs_moderado { border-left-color:var(--laranja); }
+  .cartao.abs_alto { border-left-color:var(--vermelho); }
+  .cartao.abs_extremo { border-left-color:var(--vinho); }
+  .cartao.baixa { border-left-color:var(--verde); }
+  .cartao.moderada { border-left-color:var(--amarelo); }
+  .cartao.alta { border-left-color:var(--vermelho); }
   .cartao h3 { margin:0; font-size:1rem; display:flex; justify-content:space-between; gap:8px; }
   .cartao small { color:var(--cinza); }
   .idte { font-weight:700; }
@@ -41,47 +51,67 @@
 <body>
 <header class="topo"><a href="index.html">Climando</a></header>
 <main>
-  <h1>Conforto térmico no trânsito de Campina Grande</h1>
-  <p class="sub">Estimativa por ponto, combinando temperatura do ar, efeito de ilha de calor e fluxo de tráfego. <span id="status">carregando…</span></p>
-
-  <div class="legenda">
-    <span><i style="background:var(--verde)"></i>Conforto estimado (&lt; 45%)</span>
-    <span><i style="background:var(--amarelo)"></i>Desconforto inicial (45–74%)</span>
-    <span><i style="background:var(--vermelho)"></i>Desconforto elevado (≥ 75%)</span>
-    <span><i style="background:var(--neutro)"></i>Sem índice</span>
+  <div class="seletor" role="group" aria-label="Escolha a cidade">
+    <button type="button" data-cidade="campina" aria-pressed="true">Campina Grande</button>
+    <button type="button" data-cidade="recife" aria-pressed="false">Recife</button>
   </div>
+  <h1 id="titulo">TermoTrânsito: conforto térmico no trânsito de Campina Grande</h1>
+  <p class="sub">Exposição térmica por ponto, combinando temperatura aparente (temperatura ajustada por ponto, umidade e vento) e lentidão do tráfego, classificada pela climatologia local (cor) e comparada com o histórico do próprio ponto (percentil). <span id="status">carregando…</span></p>
+
+  <div id="nota-cidade" class="nota-cidade" hidden></div>
+
+  <div class="legenda" id="legenda"></div>
 
   <div class="grade">
-    <div id="mapa" role="img" aria-label="Mapa dos pontos monitorados em Campina Grande"></div>
+    <div id="mapa" role="img" aria-label="Mapa dos pontos monitorados"></div>
     <div id="lista"></div>
   </div>
 
   <section class="aviso">
-    <h2>Como ler este indicador</h2>
-    <p>O Índice de Desconforto Térmico Estimado (IDTE) é uma heurística didática, desenvolvida no TCC "EcoTrânsito" (UFCG, 2026). Ele soma à temperatura do ar um acréscimo fixo por bairro, tirado da literatura sobre ilhas de calor em Campina Grande, e multiplica o excedente sobre 25 °C por um fator que cresce com a lentidão do tráfego. O resultado é limitado entre 0 e 100%.</p>
-    <p>Os parâmetros são convenções pedagógicas e ainda não foram validados com medições de campo. O índice não mede estresse nem comportamento de motoristas e não substitui índices bioclimáticos consagrados, como o Índice de Desconforto de Thom ou o UTCI. Pontos sem coeficiente de ilha de calor mostram só temperatura e tráfego.</p>
+    <h2>Como ler o IDTE_V2</h2>
+    <p>O IDTE_V2 (Índice de Desconforto Térmico Estimado, versão 2) responde a uma pergunta simples: neste momento, quanto calor um motorista acumula por quilômetro neste ponto, em comparação com o que costuma acumular aqui? A cada 15 minutos o sistema corrige a temperatura da API com um <strong>ajuste fixo por ponto</strong>, a temperatura aparente (Steadman) a partir da temperatura ajustada, da umidade relativa e do vento a 10 m, tira o excedente sobre 26 °C (carga térmica) e multiplica pelo tempo gasto para percorrer 1 km, com a velocidade suavizada pela mediana das três últimas leituras. O resultado é a <strong>exposição</strong>, em °C·min/km.</p>
+    <p><strong>O ajuste por ponto.</strong> A temperatura da API é uma grade meteorológica, parecida em pontos vizinhos. Para diferenciar os pontos, soma-se a ela 25% do contraste de temperatura de <strong>superfície</strong> do ponto em relação à referência (estação da Embrapa em Campina Grande; Parque da Jaqueira em Recife), medido pelo Landsat 8 e 9 entre 2014 e 2025. Esse fator de 0,25 é uma escolha, porque o contraste do ar costuma ser menor que o da superfície, e <strong>ainda não foi calibrado</strong> com medições. Pontos sem contraste válido e a própria referência recebem ajuste zero.</p>
+    <p><strong>Classificação (cor do ponto).</strong> Desde a primeira coleta, a temperatura aparente de cada ponto (já com o ajuste por ponto) é comparada com a <strong>climatologia local</strong>: a distribuição da temperatura aparente nas horas de coleta (5h às 19h) entre 2015 e 2025, calculada com os dados históricos do Open-Meteo na coordenada de referência da cidade. Abaixo do percentil 25 o ponto é "confortável"; de P25 a P50, "desconforto leve"; de P50 a P75, "moderado"; de P75 a P95, "alto"; de P95 em diante, "extremo". Os valores de corte aparecem na legenda. Portanto "desconforto alto" quer dizer que o ponto está entre os 25% de horas mais quentes do clima da cidade, e não um limite fisiológico. Os rótulos <strong>não foram validados</strong> com a percepção de motoristas, e a calibração usa todos os meses do ano, sem separar estações.</p>
+    <p><strong>Posição no histórico (percentil).</strong> Além da cor, cada ponto mostra o <strong>percentil</strong> da exposição atual entre as últimas coletas do próprio ponto (janela de cerca de 17 dias). P90 quer dizer que só 10% das coletas recentes foram piores. Só aparece depois de 100 coletas (cerca de dois dias); antes disso, o cartão indica "histórico em formação". A classe "alta" do percentil exige também carga térmica positiva.</p>
+    <p>O percentil <strong>não serve para comparar um ponto com outro</strong>: um ponto sempre quente pode ter percentil baixo. Para comparar pontos, use a cor, a temperatura aparente e a exposição em °C·min/km, que já incluem o ajuste por ponto. A temperatura aparente usada não inclui radiação solar. Os parâmetros (26 °C, janela, limiares P50/P90, faixas climatológicas) são convenções ainda sem validação de campo; a temperatura e o vento vêm de uma grade meteorológica, não de sensores no ponto. O índice não mede estresse nem comportamento de motoristas.</p>
+  </section>
+
+  <section class="aviso">
+    <h2>Contraste térmico de superfície (Landsat)</h2>
+    <p>Como informação complementar, o popup de cada ponto traz o contraste térmico de <strong>superfície</strong> medido pelos satélites Landsat 8 e 9 entre 2014 e 2025: a mediana da diferença entre a temperatura de superfície do ponto (raio de 150 m) e a de um ponto de referência, na mesma imagem. Em Campina Grande, a referência é a estação meteorológica da Embrapa (Centenário); em Recife, o Parque da Jaqueira, porque a estação da UFRPE teve poucas imagens válidas. A referência já é urbanizada, então o valor indica o excedente em relação a ela, e não em relação ao campo.</p>
+    <p>Temperatura de superfície não é temperatura do ar: o valor vem de 3 a 11 imagens de céu claro, por volta das 10h, e serve como referência espacial do calor urbano. Ele alimenta o ajuste por ponto descrito acima (com fator 0,25). A conversão para temperatura do ar, com as estações, e a calibração desse fator fazem parte da etapa de validação.</p>
   </section>
 
   <footer>
-    Temperatura do ar: <a href="https://open-meteo.com/">Open-Meteo</a> (CC BY 4.0). Tráfego: © <a href="https://www.tomtom.com/">TomTom</a>. Mapa: © colaboradores do <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
-    Grupo TROPOCLIMA, UFCG.
+    Temperatura, umidade e vento: <a href="https://open-meteo.com/">Open-Meteo</a> (CC BY 4.0). Tráfego: © <a href="https://www.tomtom.com/">TomTom</a>. Mapa: © colaboradores do <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
+    Imagens: Landsat 8 e 9 (USGS/NASA), processadas no Google Earth Engine. Grupo TROPOCLIMA, UFCG.
   </footer>
 </main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
-  var ROTULOS = {
-    conforto: "Conforto estimado",
-    desconforto_inicial: "Desconforto inicial",
-    desconforto_elevado: "Desconforto elevado",
-    sem_indice: "Sem índice"
-  };
-  var CORES = { conforto: "#2e9e4f", desconforto_inicial: "#e0a100", desconforto_elevado: "#d64545", sem_indice: "#8a8f98" };
+  var ROTULOS = { baixa: "Exposição baixa", moderada: "Exposição moderada", alta: "Exposição alta", em_formacao: "Em formação" };
+  var CORES_ABS = { confortavel: "#2e9e4f", leve: "#e0a100", moderado: "#e86f1c", alto: "#d64545", extremo: "#8e1b1b" };
+  var CORES = { baixa: "#2e9e4f", moderada: "#e0a100", alta: "#d64545", em_formacao: "#8a8f98" };
   var LIMITE_VELHO_MIN = 30;
-  var URL_DADOS = "dados/conforto_latest.json";
+  var CIDADES = {
+    campina: {
+      nome: "Campina Grande", url: "dados/conforto_latest.json", centro: [-7.23, -35.90], zoom: 12,
+      nota: ""
+    },
+    recife: {
+      nome: "Recife", url: "dados/conforto_recife_latest.json", centro: [-8.07, -34.91], zoom: 12,
+      nota: ""
+    }
+  };
+  // Contraste térmico de superfície (Landsat 8 e 9, 2014-2025): mediana em °C e número de datas, por ponto.
+  var LST = {"campina":{"tres_irmas":[4.2,10],"alpargatas":[1.8,4],"serrotao":[1.7,8],"trauma":[1.6,11],"sao_jose":[1.4,7],"malvinas":[1.1,11],"centro":[0.4,5],"uepb":[0.3,7],"prata":[0.3,8],"ufcg":[-1.1,11],"alto_branco":[-1.2,4]},"recife":{"boa_viagem":[6.1,4],"casa_amarela":[5.8,5],"ibura":[5.7,4],"av_recife":[5.4,5],"caxanga":[3.6,4],"derby":[3.4,5],"ufpe":[3.3,4],"pina":[2.9,3],"aeroporto":[2.7,4],"varzea_tip":[1.7,3]}};
+  var LST_REF = { campina: "estação da Embrapa (Centenário)", recife: "Parque da Jaqueira (ponto de controle)" };
+  var cidade = "campina";
+  var pedido = 0;
 
-  var mapa = L.map("mapa").setView([-7.23, -35.88], 12);
+  var mapa = L.map("mapa").setView(CIDADES.campina.centro, CIDADES.campina.zoom);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19, attribution: "&copy; colaboradores do OpenStreetMap"
   }).addTo(mapa);
@@ -97,32 +127,57 @@
   function num(v, casas, un) {
     return v == null ? "—" : Number(v).toFixed(casas).replace(".", ",") + (un || "");
   }
-  function detalhe(p) {
+  function lstLinha(p) {
+    var v = LST[cidade] && LST[cidade][p.id];
+    if (!v) return "";
+    return "Contraste de superfície (Landsat): " + (v[0] > 0 ? "+" : "") + num(v[0], 1, " °C") + " (" + v[1] + " datas)<br>";
+  }
+  var ROT_ABS = { confortavel: "confortável", leve: "desconforto leve", moderado: "desconforto moderado", alto: "desconforto alto", extremo: "desconforto extremo" };
+  function legenda(doc) {
+    var c = doc.cortes, el = document.getElementById("legenda");
+    var fx = function (v) { return num(v, 1); };
+    var itens = [["confortavel", c ? "Confortável (TA < " + fx(c.p25) + " °C)" : "Confortável"],
+      ["leve", c ? "Desconforto leve (" + fx(c.p25) + " a " + fx(c.p50) + ")" : "Desconforto leve"],
+      ["moderado", c ? "Desconforto moderado (" + fx(c.p50) + " a " + fx(c.p75) + ")" : "Desconforto moderado"],
+      ["alto", c ? "Desconforto alto (" + fx(c.p75) + " a " + fx(c.p95) + ")" : "Desconforto alto"],
+      ["extremo", c ? "Desconforto extremo (TA ≥ " + fx(c.p95) + " °C)" : "Desconforto extremo"]];
+    el.innerHTML = itens.map(function (it) { return "<span><i style='background:" + CORES_ABS[it[0]] + "'></i>" + it[1] + "</span>"; }).join("") +
+      "<span><i style='background:#8a8f98'></i>" + (c ? "Sem dados" : "Faixas em calibração") + "</span>";
+  }
+  function pct(p, doc) {
+    return p.idte_v2 == null ? "—" : "P" + num(p.idte_v2, 0);
+  }
+  function detalhe(p, doc) {
+    var falta = p.idte_v2 == null && doc.n_min ? " (" + p.n_amostras + " de " + doc.n_min + " coletas)" : "";
     return "<strong>" + esc(p.nome) + "</strong><br><small>" + esc(p.categoria || "") + "</small><br>" +
-      "Temperatura do ar: " + num(p.temp_ar, 1, " °C") + "<br>" +
-      (p.efeito_ilha != null ? "Acréscimo de ilha de calor: +" + num(p.efeito_ilha, 1, " °C") + "<br>" : "") +
-      "Velocidade no trecho: " + num(p.vel_atual, 0, " km/h") + " (fluxo livre " + num(p.vel_livre, 0, " km/h") + ")<br>" +
-      "Fator de trânsito: " + num(p.fator_transito, 2) + "<br>" +
-      "IDTE: <strong>" + (p.idte == null ? "—" : num(p.idte, 0, "%")) + "</strong> · " + esc(ROTULOS[p.classe] || "");
+      "Temperatura do ar (API): " + num(p.temp_ar, 1, " °C") + "<br>Ajuste de superfície: " + (p.ajuste_lst > 0 ? "+" : "") + num(p.ajuste_lst, 2, " °C") + " → temperatura ajustada " + num(p.temp_ajustada, 1, " °C") + " · umidade " + num(p.umidade, 0, "%") + " · vento " + num(p.vento, 1, " m/s") + "<br>" +
+      "Temperatura aparente: " + num(p.temp_aparente, 1, " °C") + "<br>" +
+      "Classe de conforto: <strong>" + esc(ROT_ABS[p.classe_conforto] || "sem dados") + "</strong><br>" +
+      lstLinha(p) +
+      "Velocidade no trecho: " + num(p.vel_suave != null ? p.vel_suave : p.vel_atual, 0, " km/h") + " (mediana das 3 últimas leituras)<br>Fluxo livre: " + num(p.vel_livre, 0, " km/h")+ "<br>" +
+      "Exposição: " + num(p.exposicao, 1, " °C·min/km") + "<br>" +
+      "Posição no histórico do ponto (IDTE_V2): <strong>" + pct(p) + "</strong> · " + esc(ROTULOS[p.classe] || "") + falta;
   }
 
   function render(doc) {
+    legenda(doc);
     var lista = document.getElementById("lista");
     lista.innerHTML = "";
     camada.clearLayers();
     var limites = [];
     doc.pontos.forEach(function (p) {
-      var classe = CORES[p.classe] ? p.classe : "sem_indice";
+      var classe = CORES_ABS[p.classe_conforto] ? p.classe_conforto : "sem_dados";
       var cartao = document.createElement("div");
-      cartao.className = "cartao " + classe;
-      cartao.innerHTML = "<h3><span>" + esc(p.nome) + "</span><span class='idte'>" +
-        (p.idte == null ? "—" : num(p.idte, 0, "%")) + "</span></h3>" +
-        "<small>" + esc(ROTULOS[classe]) + " · ar " + num(p.temp_ar, 1, " °C") + " · fator " + num(p.fator_transito, 2) + "</small>";
+      cartao.className = "cartao abs_" + classe;
+      var rotulo = ROT_ABS[classe] || "sem dados";
+      var hist = p.idte_v2 != null ? "P" + num(p.idte_v2, 0) + " do histórico" : "histórico em formação (" + (p.n_amostras || 0) + "/" + (doc.n_min || 100) + ")";
+      cartao.innerHTML = "<h3><span>" + esc(p.nome) + "</span><span class='idte'>" + num(p.temp_aparente, 1, " °C") + "</span></h3>" +
+        "<small><strong>" + esc(rotulo.charAt(0).toUpperCase() + rotulo.slice(1)) + "</strong> · " + hist + " · " + num(p.exposicao, 1) + " °C·min/km</small>";
       lista.appendChild(cartao);
       if (p.lat != null && p.lon != null) {
         var m = L.circleMarker([p.lat, p.lon], {
-          radius: 11, color: "#fff", weight: 2, fillColor: CORES[classe], fillOpacity: 0.95
-        }).addTo(camada).bindPopup(detalhe(p));
+          radius: 11, color: "#fff", weight: 2, fillColor: CORES_ABS[classe] || "#8a8f98", fillOpacity: 0.95
+        }).addTo(camada).bindPopup(detalhe(p, doc));
         cartao.addEventListener("click", function () { mapa.setView([p.lat, p.lon], 14); m.openPopup(); });
         limites.push([p.lat, p.lon]);
       }
@@ -145,15 +200,44 @@
   }
 
   function carregar() {
-    fetch(URL_DADOS + "?t=" + Date.now(), { cache: "no-store" })
+    var meu = ++pedido, cfg = CIDADES[cidade];
+    fetch(cfg.url + "?t=" + Date.now(), { cache: "no-store" })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (doc) { render(doc); atualizarStatus(doc); })
+      .then(function (doc) { if (meu !== pedido) return; render(doc); atualizarStatus(doc); })
       .catch(function () {
+        if (meu !== pedido) return;
         var el = document.getElementById("status");
         el.textContent = "não foi possível carregar os dados agora"; el.className = "velho";
       });
   }
-  carregar();
+
+  function escolher(c, atualizarUrl) {
+    if (!CIDADES[c]) c = "campina";
+    cidade = c; primeiraVez = true;
+    var cfg = CIDADES[c];
+    document.getElementById("titulo").textContent = "TermoTrânsito: conforto térmico no trânsito de " + cfg.nome;
+    document.title = "TermoTrânsito: " + cfg.nome + " | Climando";
+    var nota = document.getElementById("nota-cidade");
+    nota.textContent = cfg.nota; nota.hidden = !cfg.nota;
+    Array.prototype.forEach.call(document.querySelectorAll(".seletor button"), function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-cidade") === c ? "true" : "false");
+    });
+    camada.clearLayers();
+    document.getElementById("lista").innerHTML = "";
+    var el = document.getElementById("status"); el.textContent = "carregando…"; el.className = "";
+    mapa.setView(cfg.centro, cfg.zoom);
+    if (atualizarUrl) {
+      try { history.replaceState(null, "", "?cidade=" + c); } catch (e) { /* ignora */ }
+    }
+    carregar();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll(".seletor button"), function (b) {
+    b.addEventListener("click", function () { escolher(b.getAttribute("data-cidade"), true); });
+  });
+
+  var inicial = (new URLSearchParams(location.search).get("cidade") || "campina").toLowerCase();
+  escolher(inicial, false);
   setInterval(carregar, 5 * 60 * 1000);
 })();
 </script>

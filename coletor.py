@@ -27,18 +27,10 @@ A velocidade usada no passo 3 é a mediana das últimas N_SUAVE leituras do pont
 Classe relativa (histórico do ponto): baixa (< P50), moderada (P50 a < P90), alta (>= P90).
 Trava: "alta" exige também carga térmica > 0; sem ela, o ponto fica em "moderada".
 
-Classe absoluta (independente do histórico): índice de calor do NWS (Rothfusz, 1990) aplicado a T e UR,
-nas faixas do NWS: ameno (< 26,7 °C), cautela, cautela extrema, perigo, perigo extremo.
-O índice de calor não considera vento nem radiação e supõe sombra.
-
-Saídas (pasta saida/), por cidade:
-  conforto_latest.json / conforto_recife_latest.json   estado atual, lido pela página
-  hist2_AAAA-MM-DD.csv / hist2_recife_AAAA-MM-DD.csv   linhas desta coleta (publicar_ftp.py junta)
-  percentis_<cidade>.json                              janela móvel de E por ponto (estado do percentil)
-
-O estado dos percentis é baixado do servidor antes da coleta (publicar_ftp.py --baixar-estado)
-e enviado de volta depois. Só usa a biblioteca padrão do Python.
-Variáveis de ambiente: TOMTOM_KEY (exceto com --simular), OWM_KEY (se TEMP_FONTE=owm), TEMP_FONTE.
+Classe de conforto (independente do histórico do ponto): compara a temperatura aparente do ponto (com o ajuste
+do Landsat) com a climatologia local da cidade, em climatologia.json (gerado por calibrar_climatologia.py a partir
+do Open-Meteo, 2015-2025, horas 05-19): confortável (< P25), desconforto leve (P25 a < P50), moderado (P50 a < P75),
+alto (P75 a < P95), extremo (>= P95). Sem climatologia.json, a classe fica "sem_faixas".
 """
 import argparse
 import csv
@@ -69,7 +61,8 @@ N_JANELA = 1000   # coletas guardadas por ponto (~17 dias a 60 coletas/dia)
 N_MIN = 100       # coletas mínimas para exibir o percentil (~2 dias)
 P_MEDIANA, P_ALTO = 50.0, 90.0
 N_SUAVE = 3       # leituras de velocidade na mediana móvel
-FAIXAS_IC = [(26.7, "ameno"), (32.2, "cautela"), (39.4, "cautela_extrema"), (51.7, "perigo")]  # °C; acima: perigo_extremo
+CLASSES_CONFORTO = ["confortavel", "leve", "moderado", "alto", "extremo"]
+CORTES_CHAVES = ["p25", "p50", "p75", "p95"]
 
 
 def get_json(url, timeout=15):
@@ -131,23 +124,23 @@ def classificar(p, carga):
     return "alta" if (p >= P_ALTO and carga > 0) else "moderada"
 
 
-def indice_calor(t, ur):
-    """Índice de calor do NWS (Rothfusz, 1990), em °C. Devolve (valor, classe absoluta)."""
-    tf = t * 9 / 5 + 32
-    ic = 0.5 * (tf + 61.0 + (tf - 68.0) * 1.2 + ur * 0.094)
-    if (ic + tf) / 2 >= 80:
-        ic = (-42.379 + 2.04901523 * tf + 10.14333127 * ur - 0.22475541 * tf * ur - 0.00683783 * tf ** 2
-              - 0.05481717 * ur ** 2 + 0.00122874 * tf ** 2 * ur + 0.00085282 * tf * ur ** 2
-              - 0.00000199 * tf ** 2 * ur ** 2)
-        if ur < 13 and 80 <= tf <= 112:
-            ic -= ((13 - ur) / 4) * math.sqrt((17 - abs(tf - 95)) / 17)
-        elif ur > 85 and 80 <= tf <= 87:
-            ic += ((ur - 85) / 10) * ((87 - tf) / 5)
-    ic = (ic - 32) * 5 / 9
-    for limite, nome in FAIXAS_IC:
-        if ic < limite:
-            return ic, nome
-    return ic, "perigo_extremo"
+def carregar_climatologia():
+    caminho = os.path.join(AQUI, "climatologia.json")
+    try:
+        with open(caminho, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        print("aviso: climatologia.json ausente; rode o fluxo 'calibrar faixas de conforto'. Classe de conforto = sem_faixas")
+        return None
+
+
+def classe_conforto(ta, cortes):
+    if not cortes or ta is None:
+        return "sem_faixas"
+    for chave, nome in zip(CORTES_CHAVES, CLASSES_CONFORTO):
+        if ta < cortes[chave]:
+            return nome
+    return CLASSES_CONFORTO[-1]
 
 
 def mediana(v):
@@ -180,12 +173,12 @@ def salvar_estado(cfg, estado, vels, agora):
         json.dump(doc, f, separators=(",", ":"))
 
 
-def coletar_ponto(p, args, chave_tt, chave_owm, estado, vels):
+def coletar_ponto(p, args, chave_tt, chave_owm, estado, vels, cortes):
     out = {
         "id": p["id"], "nome": p["nome"], "categoria": p.get("categoria"),
         "lat": p.get("lat"), "lon": p.get("lon"),
         "temp_ar": None, "temp_ajustada": None, "dt_lst": p.get("dt_lst", 0.0), "dt_lst_n": p.get("dt_lst_n", 0), "ajuste_lst": None, "umidade": None, "vento": None, "temp_aparente": None,
-        "indice_calor": None, "classe_abs": None, "vel_suave": None,
+        "classe_conforto": None, "vel_suave": None,
         "vel_atual": None, "vel_livre": None, "atraso_min_km": None, "carga_termica": None,
         "exposicao": None, "idte_v2": None, "classe": "em_formacao", "n_amostras": 0,
         "confianca": None, "status": "ok", "erros": [],
@@ -219,8 +212,7 @@ def coletar_ponto(p, args, chave_tt, chave_owm, estado, vels):
         t_aj = clima[0] + out["ajuste_lst"]
         out["temp_ajustada"] = round(t_aj, 1)
         out["temp_aparente"] = round(temperatura_aparente(t_aj, clima[1], clima[2]), 1)
-        ic, out["classe_abs"] = indice_calor(t_aj, clima[1])
-        out["indice_calor"] = round(ic, 1)
+        out["classe_conforto"] = classe_conforto(out["temp_aparente"], cortes)
     if tt:
         out["vel_atual"], out["vel_livre"], out["confianca"] = tt["vel_atual"], tt["vel_livre"], tt["confianca"]
 
@@ -275,7 +267,9 @@ def processar_cidade(chave, cfg, args, chave_tt, chave_owm, agora):
     with open(os.path.join(AQUI, cfg["pontos"]), encoding="utf-8") as f:
         pontos = json.load(f)["pontos"]
     estado, vels = carregar_estado(cfg)
-    resultados = [coletar_ponto(p, args, chave_tt, chave_owm, estado, vels) for p in pontos]
+    clim = (carregar_climatologia() or {}).get("cidades", {}).get(chave) or {}
+    cortes = clim.get("cortes")
+    resultados = [coletar_ponto(p, args, chave_tt, chave_owm, estado, vels, cortes) for p in pontos]
     ok = sum(1 for r in resultados if r["status"] == "ok")
     if ok == 0 and not args.simular:
         print(f"{chave}: nenhum ponto válido; arquivos não atualizados")
@@ -284,7 +278,7 @@ def processar_cidade(chave, cfg, args, chave_tt, chave_owm, agora):
         return 0, len(resultados)
 
     os.makedirs(SAIDA, exist_ok=True)
-    doc = {"versao": 3, "k_lst": K_LST, "cidade": chave, "gerado_em": agora.isoformat(timespec="seconds"),
+    doc = {"versao": 3, "k_lst": K_LST, "cortes": cortes, "cortes_ref": clim.get("referencia"), "cidade": chave, "gerado_em": agora.isoformat(timespec="seconds"),
            "simulado": bool(args.simular), "n_min": N_MIN, "n_janela": N_JANELA, "pontos": resultados}
     with open(os.path.join(SAIDA, cfg["latest"]), "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, indent=1)
@@ -292,11 +286,11 @@ def processar_cidade(chave, cfg, args, chave_tt, chave_owm, agora):
 
     with open(os.path.join(SAIDA, f"{cfg['hist']}_{agora:%Y-%m-%d}.csv"), "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["data_hora", "id", "temp_ar", "ajuste_lst", "temp_ajustada", "umidade", "vento_ms", "temp_aparente", "indice_calor", "classe_abs", "vel_atual", "vel_suave", "vel_livre",
+        w.writerow(["data_hora", "id", "temp_ar", "ajuste_lst", "temp_ajustada", "umidade", "vento_ms", "temp_aparente", "classe_conforto", "vel_atual", "vel_suave", "vel_livre",
                     "atraso_min_km", "carga_termica", "exposicao", "idte_v2", "classe", "n_amostras", "status"])
         for r in resultados:
             w.writerow([agora.isoformat(timespec="seconds"), r["id"], r["temp_ar"], r["ajuste_lst"], r["temp_ajustada"], r["umidade"], r["vento"],
-                        r["temp_aparente"], r["indice_calor"], r["classe_abs"], r["vel_atual"], r["vel_suave"], r["vel_livre"], r["atraso_min_km"], r["carga_termica"],
+                        r["temp_aparente"], r["classe_conforto"], r["vel_atual"], r["vel_suave"], r["vel_livre"], r["atraso_min_km"], r["carga_termica"],
                         r["exposicao"], r["idte_v2"], r["classe"], r["n_amostras"], r["status"]])
 
     print(f"{agora:%H:%M} {chave}: {ok}/{len(resultados)} pontos ok")

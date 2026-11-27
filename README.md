@@ -22,13 +22,17 @@ A página `conforto.html` lê os JSON; nenhuma chave de API fica no navegador. S
 5. Exposição: `E = CT · t` (°C·min/km).
 6. **IDTE_V2** = percentil de `E` entre as últimas 1000 coletas do próprio ponto (0 a 100). Aparece só com pelo menos 100 coletas ("em formação" antes). Classes: baixa (< P50), moderada (P50 a < P90), alta (≥ P90 **e** carga térmica > 0).
 7. **Velocidade suavizada:** no passo 4 usa-se a mediana das últimas 3 leituras do ponto (`N_SUAVE`), para reduzir o ruído do tráfego. A velocidade bruta continua gravada.
-8. **Classe absoluta (independente do histórico):** índice de calor do NWS (Rothfusz, 1990) com temperatura e umidade, nas faixas ameno (< 26,7 °C), cautela, cautela extrema (≥ 32,2), perigo (≥ 39,4) e perigo extremo (≥ 51,7). Não considera vento nem radiação.
+8. **Classe de conforto (independente do histórico do ponto):** a temperatura aparente do ponto (com o ajuste do Landsat) é comparada com os cortes P25, P50, P75 e P95 da climatologia local, guardados em `climatologia.json`: confortável (< P25), desconforto leve, moderado, alto e extremo (≥ P95). A climatologia é a temperatura aparente horária, das 5h às 19h, de 2015 a 2025, calculada com o histórico do Open-Meteo na coordenada de referência (Embrapa; UFRPE).
 
-Parâmetros no topo de `coletor.py`: `T_REF`, `V_MIN`, `N_JANELA`, `N_MIN`, `P_MEDIANA`, `P_ALTO`, `N_SUAVE`, `FAIXAS_IC`. São convenções, ainda sem validação de campo. O percentil é relativo ao histórico de cada ponto e não permite comparar pontos entre si; para isso use a exposição.
+Parâmetros no topo de `coletor.py`: `T_REF`, `V_MIN`, `N_JANELA`, `N_MIN`, `P_MEDIANA`, `P_ALTO`, `N_SUAVE`. São convenções, ainda sem validação de campo. O percentil é relativo ao histórico de cada ponto e não permite comparar pontos entre si; para isso use a exposição.
+
+## Calibrar as faixas de conforto (fazer uma vez)
+
+Depois de subir os arquivos, vá em **Actions → "TermoTrânsito - calibrar faixas de conforto (climatologia)" → Run workflow**. O fluxo baixa 11 anos de dados do Open-Meteo, calcula os cortes e grava `climatologia.json` no repositório (cerca de 1 a 3 minutos). Enquanto esse arquivo não existir, os pontos aparecem como "faixas em calibração". Os cortes calculados ficam no log do fluxo. Para testar sem rede: `python calibrar_climatologia.py --teste`.
 
 ## Atualização de esquema
 
-O `hist2_*.csv` ganhou colunas (`ajuste_lst`, `temp_ajustada`, `indice_calor`, `classe_abs`, `vel_suave`). Se o arquivo do dia no servidor tiver o cabeçalho antigo, `publicar_ftp.py` o guarda como `*.esquema-anterior` e começa um novo. Os `percentis_*.json` de versão anterior são descartados automaticamente (a exposição passou a usar a temperatura ajustada) e a janela recomeça, com nova fase "em formação" de cerca de 2 dias.
+O `hist2_*.csv` ganhou colunas (`ajuste_lst`, `temp_ajustada`, `classe_conforto`, `vel_suave`). Se o arquivo do dia no servidor tiver o cabeçalho antigo, `publicar_ftp.py` o guarda como `*.esquema-anterior` e começa um novo. Os `percentis_*.json` de versão anterior são descartados automaticamente (a exposição passou a usar a temperatura ajustada) e a janela recomeça, com nova fase "em formação" de cerca de 2 dias.
 
 ## Partida a frio
 
@@ -38,7 +42,8 @@ O histórico antigo (`hist_*.csv`) não tem umidade nem vento e não é usado. O
 
 - `pontos.json` (Campina Grande) e `pontos_recife.json` (Recife): id, nome, categoria, coordenadas, `dt_lst` e `dt_lst_n` (contraste de superfície e número de datas). Para atualizar o contraste, rode `resumir_lst.py` e copie os valores.
 - `coletor.py`: `--cidade campina|recife`, `--simular` (testa sem APIs), `--verificar` (mostra o trecho de via que a TomTom associou a cada ponto).
-- `.github/workflows/coletar.yml` (coleta) e `verificar.yml` (manual).
+- `calibrar_climatologia.py`: gera `climatologia.json` (cortes da climatologia local).
+- `.github/workflows/coletar.yml` (coleta), `calibrar.yml` (calibração, manual) e `verificar.yml` (manual).
 
 ## Teste local
 
