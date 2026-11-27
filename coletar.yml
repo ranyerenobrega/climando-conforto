@@ -1,0 +1,47 @@
+name: TermoTrânsito - coletar dados
+
+on:
+  # Disparado a cada 15 min, das 05h às 19h, pelo cron-job.org (via API do GitHub).
+  workflow_dispatch:
+
+concurrency:
+  group: coleta-conforto
+  cancel-in-progress: false
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Baixar estado dos percentis (HostGator)
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+          FTP_DIR: ${{ vars.FTP_DIR || 'public_html/dados' }}
+          FTP_TLS: ${{ vars.FTP_TLS || '1' }}
+        run: python publicar_ftp.py --baixar-estado
+
+      - name: Coletar dados (IDTE_V2)
+        env:
+          TOMTOM_KEY: ${{ secrets.TOMTOM_KEY }}
+          OWM_KEY: ${{ secrets.OWM_KEY }}
+          TEMP_FONTE: ${{ vars.TEMP_FONTE || 'openmeteo' }}
+          K_LST: ${{ vars.K_LST || '0.25' }}
+          AJUSTE_TRANSITO: ${{ vars.AJUSTE_TRANSITO || '1' }}
+        run: python coletor.py
+
+      - name: Publicar no HostGator (FTP)
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+          FTP_DIR: ${{ vars.FTP_DIR || 'public_html/dados' }}
+          FTP_TLS: ${{ vars.FTP_TLS || '1' }}
+        run: python publicar_ftp.py

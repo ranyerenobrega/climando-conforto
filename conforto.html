@@ -29,11 +29,12 @@
   #mapa { height:520px; border-radius:12px; border:1px solid #e5d9c6; }
   #lista { display:flex; flex-direction:column; gap:8px; max-height:520px; overflow:auto; }
   .cartao { background:#fff; border:1px solid #e5d9c6; border-left:6px solid var(--neutro); border-radius:10px; padding:10px 12px; cursor:pointer; }
-  .cartao.abs_confortavel { border-left-color:var(--verde); }
-  .cartao.abs_leve { border-left-color:var(--amarelo); }
-  .cartao.abs_moderado { border-left-color:var(--laranja); }
-  .cartao.abs_alto { border-left-color:var(--vermelho); }
-  .cartao.abs_extremo { border-left-color:var(--vinho); }
+  .cartao.abs_sem_desconforto { border-left-color:#2e9e4f; }
+  .cartao.abs_menos_metade { border-left-color:#9bbf3b; }
+  .cartao.abs_mais_metade { border-left-color:#e0a100; }
+  .cartao.abs_maioria { border-left-color:#e86f1c; }
+  .cartao.abs_estresse_forte { border-left-color:#d64545; }
+  .cartao.abs_emergencia { border-left-color:#8e1b1b; }
   .cartao.baixa { border-left-color:var(--verde); }
   .cartao.moderada { border-left-color:var(--amarelo); }
   .cartao.alta { border-left-color:var(--vermelho); }
@@ -56,7 +57,7 @@
     <button type="button" data-cidade="recife" aria-pressed="false">Recife</button>
   </div>
   <h1 id="titulo">TermoTrânsito: conforto térmico no trânsito de Campina Grande</h1>
-  <p class="sub">Conforto térmico por ponto: temperatura aparente comparada com a climatologia do mesmo mês e horário, agravada pela lentidão do trânsito (cor), e posição no histórico do próprio ponto (percentil). <span id="status">carregando…</span></p>
+  <p class="sub">Conforto térmico por ponto: Índice de Desconforto de Thom (temperatura ajustada e umidade), agravado pela lentidão do trânsito (cor), e posição da exposição no histórico do próprio ponto (percentil). <span id="status">carregando…</span></p>
 
   <div id="nota-cidade" class="nota-cidade" hidden></div>
 
@@ -71,9 +72,9 @@
     <h2>Como ler o IDTE_V2</h2>
     <p>O IDTE_V2 (Índice de Desconforto Térmico Estimado, versão 2) responde a uma pergunta simples: neste momento, quanto calor um motorista acumula por quilômetro neste ponto, em comparação com o que costuma acumular aqui? A cada 15 minutos o sistema corrige a temperatura da API com um <strong>ajuste fixo por ponto</strong>, a temperatura aparente (Steadman) a partir da temperatura ajustada, da umidade relativa e do vento a 10 m, tira o excedente sobre 26 °C (carga térmica) e multiplica pelo tempo gasto para percorrer 1 km, com a velocidade suavizada pela mediana das três últimas leituras. O resultado é a <strong>exposição</strong>, em °C·min/km.</p>
     <p><strong>O ajuste por ponto.</strong> A temperatura da API é uma grade meteorológica, parecida em pontos vizinhos. Para diferenciar os pontos, soma-se a ela 25% do contraste de temperatura de <strong>superfície</strong> do ponto em relação à referência (estação da Embrapa em Campina Grande; Parque da Jaqueira em Recife), medido pelo Landsat 8 e 9 entre 2014 e 2025. Esse fator de 0,25 é uma escolha, porque o contraste do ar costuma ser menor que o da superfície, e <strong>ainda não foi calibrado</strong> com medições. Pontos sem contraste válido e a própria referência recebem ajuste zero.</p>
-    <p><strong>Classificação (cor do ponto).</strong> Desde a primeira coleta, a classe sai de dois passos. Primeiro, a temperatura aparente do ponto (já com o ajuste por ponto) é comparada com a <strong>climatologia local do mesmo mês e da mesma hora</strong>: a distribuição da temperatura aparente entre 2015 e 2025, calculada com os dados históricos do Open-Meteo na coordenada de referência da cidade. Abaixo do percentil 25 o calor é "confortável"; de P25 a P50, "leve"; de P50 a P75, "moderado"; de P75 a P95, "alto"; de P95 em diante, "extremo". Assim, uma tarde de novembro às 15h é comparada com as tardes de novembro às 15h dos últimos 11 anos. Segundo, o <strong>trânsito</strong>: se a velocidade está abaixo de 80% da de fluxo livre (lento), a classe sobe um nível; abaixo de 50% (congestionado), sobe dois, até "extremo". A legenda mostra os cortes do horário atual. "Desconforto alto" quer dizer, portanto, calor acima do habitual para aquele horário e época, agravado ou não pelo trânsito, e não um limite fisiológico. As faixas e os limites de 80% e 50% são convenções <strong>não validadas</strong> com a percepção de motoristas.</p>
+    <p><strong>Classificação (cor do ponto).</strong> A cor vem do <strong>Índice de Desconforto de Thom</strong> (IDT; THOM, 1959), calculado com a temperatura ajustada do ponto e a umidade relativa: IDT = T − (0,55 − 0,0055·UR)·(T − 14,5). As classes são as de Giles et al. (1990): abaixo de 21, sem desconforto; de 21 a 24, menos de 50% das pessoas sentem desconforto; de 24 a 27, mais de 50%; de 27 a 29, a maioria, com deterioração da condição física; de 29 a 32, estresse térmico forte para todos; 32 ou mais, emergência médica. Em seguida entra o <strong>trânsito</strong>: com velocidade abaixo de 80% da de fluxo livre (lento), a classe sobe um nível; abaixo de 50% (congestionado), sobe dois. As faixas de Giles foram definidas fora do Brasil e, assim como o ajuste pelo trânsito, <strong>não foram validadas</strong> para motoristas de Campina Grande e Recife. O IDT não considera vento nem radiação solar.</p>
     <p><strong>Posição no histórico (percentil).</strong> Além da cor, cada ponto mostra o <strong>percentil</strong> da exposição atual entre as últimas coletas do próprio ponto (janela de cerca de 17 dias). P90 quer dizer que só 10% das coletas recentes foram piores. Só aparece depois de 100 coletas (cerca de dois dias); antes disso, o cartão indica "histórico em formação". A classe "alta" do percentil exige também carga térmica positiva.</p>
-    <p>O percentil <strong>não serve para comparar um ponto com outro</strong>: um ponto sempre quente pode ter percentil baixo. Para comparar pontos, use a cor, a temperatura aparente e a exposição em °C·min/km, que já incluem o ajuste por ponto. A temperatura aparente usada não inclui radiação solar. Os parâmetros (26 °C, janela, limiares P50/P90, faixas climatológicas) são convenções ainda sem validação de campo; a temperatura e o vento vêm de uma grade meteorológica, não de sensores no ponto. O índice não mede estresse nem comportamento de motoristas.</p>
+    <p>O percentil <strong>não serve para comparar um ponto com outro</strong>: um ponto sempre quente pode ter percentil baixo. Para comparar pontos, use a cor, o IDT, a temperatura aparente e a exposição em °C·min/km, que já incluem o ajuste por ponto. A temperatura aparente usada não inclui radiação solar. Os parâmetros (26 °C, janela, limiares P50/P90, faixas climatológicas) são convenções ainda sem validação de campo; a temperatura e o vento vêm de uma grade meteorológica, não de sensores no ponto. O índice não mede estresse nem comportamento de motoristas.</p>
   </section>
 
   <section class="aviso">
@@ -92,7 +93,7 @@
 <script>
 (function () {
   var ROTULOS = { baixa: "Exposição baixa", moderada: "Exposição moderada", alta: "Exposição alta", em_formacao: "Em formação" };
-  var CORES_ABS = { confortavel: "#2e9e4f", leve: "#e0a100", moderado: "#e86f1c", alto: "#d64545", extremo: "#8e1b1b" };
+  var CORES_ABS = { sem_desconforto: "#2e9e4f", menos_metade: "#9bbf3b", mais_metade: "#e0a100", maioria: "#e86f1c", estresse_forte: "#d64545", emergencia: "#8e1b1b" };
   var CORES = { baixa: "#2e9e4f", moderada: "#e0a100", alta: "#d64545", em_formacao: "#8a8f98" };
   var LIMITE_VELHO_MIN = 30;
   var CIDADES = {
@@ -132,7 +133,7 @@
     if (!v) return "";
     return "Contraste de superfície (Landsat): " + (v[0] > 0 ? "+" : "") + num(v[0], 1, " °C") + " (" + v[1] + " datas)<br>";
   }
-  var ROT_ABS = { confortavel: "confortável", leve: "desconforto leve", moderado: "desconforto moderado", alto: "desconforto alto", extremo: "desconforto extremo" };
+  var ROT_ABS = { sem_desconforto: "sem desconforto", menos_metade: "desconforto em menos de 50% das pessoas", mais_metade: "desconforto em mais de 50% das pessoas", maioria: "desconforto na maioria das pessoas", estresse_forte: "estresse térmico forte", emergencia: "emergência médica" };
   var MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
   var ROT_TR = { livre: "trânsito livre", lento: "trânsito lento (+1)", congestionado: "congestionado (+2)" };
   function nomeMesHora(q) {
@@ -140,16 +141,13 @@
     return (MESES[parseInt(p[0], 10) - 1] || p[0]) + ", " + p[1];
   }
   function legenda(doc) {
-    var c = doc.cortes, el = document.getElementById("legenda");
-    var fx = function (v) { return num(v, 1); };
-    var itens = [["confortavel", c ? "Confortável (TA < " + fx(c.p25) + " °C)" : "Confortável"],
-      ["leve", c ? "Desconforto leve (" + fx(c.p25) + " a " + fx(c.p50) + ")" : "Desconforto leve"],
-      ["moderado", c ? "Desconforto moderado (" + fx(c.p50) + " a " + fx(c.p75) + ")" : "Desconforto moderado"],
-      ["alto", c ? "Desconforto alto (" + fx(c.p75) + " a " + fx(c.p95) + ")" : "Desconforto alto"],
-      ["extremo", c ? "Desconforto extremo (TA ≥ " + fx(c.p95) + " °C)" : "Desconforto extremo"]];
-    el.innerHTML = itens.map(function (it) { return "<span><i style='background:" + CORES_ABS[it[0]] + "'></i>" + it[1] + "</span>"; }).join("") +
-      "<span><i style='background:#8a8f98'></i>" + (c ? "Sem dados" : "Faixas em calibração") + "</span>" +
-      (c && doc.cortes_quando && doc.cortes_quando !== "geral" ? "<span><small>Faixas de temperatura aparente para " + esc(nomeMesHora(doc.cortes_quando)) + "; o trânsito lento sobe 1 classe e o congestionado, 2.</small></span>" : "");
+    var itens = [["sem_desconforto", "Sem desconforto (IDT < 21)"], ["menos_metade", "Menos de 50% em desconforto (21–24)"],
+      ["mais_metade", "Mais de 50% em desconforto (24–27)"], ["maioria", "Maioria em desconforto (27–29)"],
+      ["estresse_forte", "Estresse forte (29–32)"], ["emergencia", "Emergência médica (≥ 32)"]];
+    document.getElementById("legenda").innerHTML = itens.map(function (it) {
+      return "<span><i style='background:" + CORES_ABS[it[0]] + "'></i>" + it[1] + "</span>"; }).join("") +
+      "<span><i style='background:#8a8f98'></i>Sem dados</span>" +
+      (doc.ajuste_transito !== false ? "<span><small>Trânsito lento sobe 1 classe; congestionado, 2.</small></span>" : "");
   }
   function pct(p, doc) {
     return p.idte_v2 == null ? "—" : "P" + num(p.idte_v2, 0);
@@ -159,7 +157,7 @@
     return "<strong>" + esc(p.nome) + "</strong><br><small>" + esc(p.categoria || "") + "</small><br>" +
       "Temperatura do ar (API): " + num(p.temp_ar, 1, " °C") + "<br>Ajuste de superfície: " + (p.ajuste_lst > 0 ? "+" : "") + num(p.ajuste_lst, 2, " °C") + " → temperatura ajustada " + num(p.temp_ajustada, 1, " °C") + " · umidade " + num(p.umidade, 0, "%") + " · vento " + num(p.vento, 1, " m/s") + "<br>" +
       "Temperatura aparente: " + num(p.temp_aparente, 1, " °C") + "<br>" +
-      "Calor (climatologia do horário): " + esc(ROT_ABS[p.classe_calor] || "—") + " · " + esc(ROT_TR[p.transito] || "trânsito sem dado") + "<br>" +
+      "IDT de Thom: " + num(p.idt, 1, " °C") + " → " + esc(ROT_ABS[p.classe_calor] || "—") + " · " + esc(ROT_TR[p.transito] || "trânsito sem dado") + "<br>" +
       "Classe de conforto: <strong>" + esc(ROT_ABS[p.classe_conforto] || "sem dados") + "</strong><br>" +
       lstLinha(p) +
       "Velocidade no trecho: " + num(p.vel_suave != null ? p.vel_suave : p.vel_atual, 0, " km/h") + " (mediana das 3 últimas leituras)<br>Fluxo livre: " + num(p.vel_livre, 0, " km/h")+ "<br>" +
@@ -180,8 +178,8 @@
       var rotulo = ROT_ABS[classe] || "sem dados";
       var tr = ROT_TR[p.transito] ? " · " + ROT_TR[p.transito] : "";
       var hist = p.idte_v2 != null ? "P" + num(p.idte_v2, 0) + " do histórico" : "histórico em formação (" + (p.n_amostras || 0) + "/" + (doc.n_min || 100) + ")";
-      cartao.innerHTML = "<h3><span>" + esc(p.nome) + "</span><span class='idte'>" + num(p.temp_aparente, 1, " °C") + "</span></h3>" +
-        "<small><strong>" + esc(rotulo.charAt(0).toUpperCase() + rotulo.slice(1)) + "</strong>" + tr + " · " + hist + " · " + num(p.exposicao, 1) + " °C·min/km</small>";
+      cartao.innerHTML = "<h3><span>" + esc(p.nome) + "</span><span class='idte'>IDT " + num(p.idt, 1) + "</span></h3>" +
+        "<small><strong>" + esc(rotulo.charAt(0).toUpperCase() + rotulo.slice(1)) + "</strong>" + tr + " · " + hist + " · TA " + num(p.temp_aparente, 1, " °C") + " · " + num(p.exposicao, 1) + " °C·min/km</small>";
       lista.appendChild(cartao);
       if (p.lat != null && p.lon != null) {
         var m = L.circleMarker([p.lat, p.lon], {

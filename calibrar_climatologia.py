@@ -35,6 +35,30 @@ CIDADES = {
 }
 
 
+IDT_LIMITES = [21.0, 24.0, 27.0, 29.0, 32.0]   # Giles et al. (1990)
+IDT_CLASSES = ["sem_desconforto", "menos_metade", "mais_metade", "maioria", "estresse_forte", "emergencia"]
+
+
+def idt_thom(t, ur):
+    """Índice de Desconforto de Thom (1959), °C."""
+    return t - (0.55 - 0.0055 * ur) * (t - 14.5)
+
+
+def classe_idt(v):
+    for lim, nome in zip(IDT_LIMITES, IDT_CLASSES):
+        if v < lim:
+            return nome
+    return IDT_CLASSES[-1]
+
+
+def freq_idt(valores):
+    n = len(valores)
+    cont = {c: 0 for c in IDT_CLASSES}
+    for v in valores:
+        cont[classe_idt(v)] += 1
+    return {c: round(100.0 * k / n, 1) for c, k in cont.items()}
+
+
 def temperatura_aparente(t, ur, vento):
     e = (ur / 100.0) * 6.105 * math.exp(17.27 * t / (237.7 + t))
     return t + 0.33 * e - 0.70 * vento - 4.00
@@ -76,7 +100,7 @@ def serie_ta(h):
             continue
         hh = int(hora[11:13])
         if HORA_INI <= hh <= HORA_FIM:
-            out.append((int(hora[5:7]), hh, temperatura_aparente(t, ur, w)))
+            out.append((int(hora[5:7]), hh, temperatura_aparente(t, ur, w), idt_thom(t, ur)))
     return out
 
 
@@ -86,7 +110,8 @@ def serie_teste():
         m = random.randint(1, 12)
         for hh in range(HORA_INI, HORA_FIM + 1):
             base = 24 + 6 * math.sin(math.pi * (hh - 5) / 14)
-            out.append((m, hh, temperatura_aparente(random.gauss(base, 1.5), random.uniform(45, 90), random.uniform(0.5, 5))))
+            t, ur = random.gauss(base, 1.5), random.uniform(45, 90)
+            out.append((m, hh, temperatura_aparente(t, ur, random.uniform(0.5, 5)), idt_thom(t, ur)))
     return out
 
 
@@ -97,7 +122,7 @@ def cortes_de(valores):
 
 def main():
     teste = "--teste" in sys.argv
-    doc = {"versao": 2, "periodo": f"{ANO_INI}-{ANO_FIM}", "horas": f"{HORA_INI:02d}-{HORA_FIM:02d}",
+    doc = {"versao": 3, "periodo": f"{ANO_INI}-{ANO_FIM}", "horas": f"{HORA_INI:02d}-{HORA_FIM:02d}",
            "variavel": "temperatura aparente (Steadman, sem radiação)", "cidades": {}}
     for chave, c in CIDADES.items():
         if teste:
@@ -108,19 +133,33 @@ def main():
                 ta += serie_ta(baixar_ano(c["lat"], c["lon"], ano))
                 print(f"{chave} {ano}: {len(ta)} horas acumuladas", flush=True)
         grupos = {}
-        for m, hh, v in ta:
+        for m, hh, v, _ in ta:
             grupos.setdefault(m, {}).setdefault(hh, []).append(v)
         cortes_mh = {str(m): {str(hh): cortes_de(vs) for hh, vs in sorted(hs.items())} for m, hs in sorted(grupos.items())}
         n_min = min(len(vs) for hs in grupos.values() for vs in hs.values())
-        cortes = cortes_de([v for _, _, v in ta])
+        cortes = cortes_de([x[2] for x in ta])
+        idt_geral = freq_idt([x[3] for x in ta])
+        idt_mes = {str(m): freq_idt([x[3] for x in ta if x[0] == m]) for m in range(1, 13)}
+        idt_hora = {str(h): freq_idt([x[3] for x in ta if x[1] == h]) for h in range(HORA_INI, HORA_FIM + 1)}
+        idt_med15 = {str(m): round(percentil(sorted(x[3] for x in ta if x[0] == m and x[1] == 15), 50), 1) for m in range(1, 13)}
         doc["cidades"][chave] = {"referencia": c["referencia"], "lat": c["lat"], "lon": c["lon"],
-                                 "n_horas": len(ta), "n_min_por_celula": n_min, "cortes": cortes, "cortes_mh": cortes_mh}
+                                 "n_horas": len(ta), "n_min_por_celula": n_min, "cortes": cortes, "cortes_mh": cortes_mh,
+                                 "idt_freq_geral": idt_geral, "idt_freq_mes": idt_mes, "idt_freq_hora": idt_hora,
+                                 "idt_mediana_15h": idt_med15}
         print(f"{chave}: {len(ta)} horas; mínimo de {n_min} horas por combinação mês-hora; cortes gerais: {cortes}")
         print(f"{chave}: cortes às 9h e às 15h, por mês (P25 / P50 / P75 / P95):")
         for m in sorted(grupos):
             c9, c15 = cortes_mh[str(m)].get("9"), cortes_mh[str(m)].get("15")
             f = lambda c: " / ".join(f"{c[k]:.1f}" for k in ("p25", "p50", "p75", "p95")) if c else "-"
             print(f"  mês {m:2d}   9h: {f(c9)}   15h: {f(c15)}")
+        cab = "  <21 / 21-24 / 24-27 / 27-29 / 29-32 / >=32"
+        g = lambda d: " / ".join(f"{d[c]:5.1f}" for c in IDT_CLASSES)
+        print(f"{chave}: IDT de Thom, % de horas por classe de Giles (5h-19h, 2015-2025)\n{cab}")
+        print(f"  geral   {g(idt_geral)}")
+        for m in range(1, 13):
+            print(f"  mês {m:2d}  {g(idt_mes[str(m)])}   mediana às 15h: {idt_med15[str(m)]}")
+        for h in (6, 9, 12, 15, 18):
+            print(f"  {h:2d}h     {g(idt_hora[str(h)])}")
     if teste:
         print("modo teste: nada gravado")
         return
