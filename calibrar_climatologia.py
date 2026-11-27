@@ -17,6 +17,7 @@ import math
 import os
 import random
 import sys
+import time
 import urllib.parse
 import urllib.request
 
@@ -24,6 +25,8 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 ANO_INI, ANO_FIM = 2015, 2025
 HORA_INI, HORA_FIM = 5, 19          # janela de coleta do monitor, inclusive
 PERCENTIS = (25, 50, 75, 95)
+TENTATIVAS = 6     # por ano, com espera crescente (15, 30, 60, 120, 240 s)
+PAUSA = 3          # segundos entre requisições
 CIDADES = {
     "campina": {"referencia": "Embrapa (Centenário)", "lat": -7.22559, "lon": -35.9053859},
     "recife": {"referencia": "UFRPE (Dois Irmãos)", "lat": -8.0175579, "lon": -34.9492827},
@@ -49,8 +52,18 @@ def baixar_ano(lat, lon, ano):
         "timezone": "America/Fortaleza"})
     req = urllib.request.Request("https://archive-api.open-meteo.com/v1/archive?" + q,
                                  headers={"User-Agent": "termotransito/2.0"})
-    with urllib.request.urlopen(req, timeout=120) as r:
-        return json.loads(r.read().decode("utf-8"))["hourly"]
+    for tentativa in range(1, TENTATIVAS + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=180) as r:
+                dados = json.loads(r.read().decode("utf-8"))["hourly"]
+            time.sleep(PAUSA)  # respeita o limite de requisições da API gratuita
+            return dados
+        except Exception as e:  # noqa: BLE001  (timeout, 429, erro de rede)
+            if tentativa == TENTATIVAS:
+                raise
+            espera = 15 * 2 ** (tentativa - 1)
+            print(f"  {ano}: falhou ({e}); nova tentativa em {espera} s", flush=True)
+            time.sleep(espera)
 
 
 def serie_ta(h):
