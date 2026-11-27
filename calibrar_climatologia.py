@@ -4,9 +4,11 @@
 Para cada cidade, baixa a série horária de temperatura a 2 m, umidade relativa e vento a 10 m de uma coordenada
 de referência (Embrapa, em Campina Grande; UFRPE, no Recife) entre ANO_INI e ANO_FIM, mantém só as horas da
 janela de coleta do monitor (05h-19h, horário local), calcula a temperatura aparente (a mesma fórmula do coletor)
-e grava em climatologia.json os cortes P25, P50, P75 e P95 dessa distribuição.
+e grava em climatologia.json os cortes P25, P50, P75 e P95 dessa distribuição para cada combinação de mês e
+hora (cortes_mh: mês 1-12 -> hora 5-19), além dos cortes gerais (todas as horas e meses), usados só como reserva.
 
-O coletor classifica cada ponto comparando a sua temperatura aparente (já com o ajuste do Landsat) com esses cortes:
+O coletor classifica cada ponto comparando a sua temperatura aparente (já com o ajuste do Landsat) com os cortes
+do mês e da hora da coleta:
   confortável (< P25), desconforto leve (P25 a < P50), moderado (P50 a < P75), alto (P75 a < P95), extremo (>= P95).
 
 Uso:  python calibrar_climatologia.py            (precisa de internet; só biblioteca padrão)
@@ -67,24 +69,35 @@ def baixar_ano(lat, lon, ano):
 
 
 def serie_ta(h):
-    """Temperatura aparente das horas dentro da janela de coleta."""
+    """Lista de (mês, hora, temperatura aparente) das horas dentro da janela de coleta."""
     out = []
     for hora, t, ur, w in zip(h["time"], h["temperature_2m"], h["relative_humidity_2m"], h["wind_speed_10m"]):
         if None in (t, ur, w):
             continue
-        if HORA_INI <= int(hora[11:13]) <= HORA_FIM:
-            out.append(temperatura_aparente(t, ur, w))
+        hh = int(hora[11:13])
+        if HORA_INI <= hh <= HORA_FIM:
+            out.append((int(hora[5:7]), hh, temperatura_aparente(t, ur, w)))
     return out
 
 
 def serie_teste():
-    return [temperatura_aparente(random.gauss(28, 2.5), random.uniform(50, 90), random.uniform(0.5, 5))
-            for _ in range(11 * 365 * 15)]
+    out = []
+    for _ in range(11 * 365):
+        m = random.randint(1, 12)
+        for hh in range(HORA_INI, HORA_FIM + 1):
+            base = 24 + 6 * math.sin(math.pi * (hh - 5) / 14)
+            out.append((m, hh, temperatura_aparente(random.gauss(base, 1.5), random.uniform(45, 90), random.uniform(0.5, 5))))
+    return out
+
+
+def cortes_de(valores):
+    v = sorted(valores)
+    return {f"p{p}": round(percentil(v, p), 2) for p in PERCENTIS}
 
 
 def main():
     teste = "--teste" in sys.argv
-    doc = {"versao": 1, "periodo": f"{ANO_INI}-{ANO_FIM}", "horas": f"{HORA_INI:02d}-{HORA_FIM:02d}",
+    doc = {"versao": 2, "periodo": f"{ANO_INI}-{ANO_FIM}", "horas": f"{HORA_INI:02d}-{HORA_FIM:02d}",
            "variavel": "temperatura aparente (Steadman, sem radiação)", "cidades": {}}
     for chave, c in CIDADES.items():
         if teste:
@@ -94,11 +107,20 @@ def main():
             for ano in range(ANO_INI, ANO_FIM + 1):
                 ta += serie_ta(baixar_ano(c["lat"], c["lon"], ano))
                 print(f"{chave} {ano}: {len(ta)} horas acumuladas", flush=True)
-        ta.sort()
-        cortes = {f"p{p}": round(percentil(ta, p), 2) for p in PERCENTIS}
+        grupos = {}
+        for m, hh, v in ta:
+            grupos.setdefault(m, {}).setdefault(hh, []).append(v)
+        cortes_mh = {str(m): {str(hh): cortes_de(vs) for hh, vs in sorted(hs.items())} for m, hs in sorted(grupos.items())}
+        n_min = min(len(vs) for hs in grupos.values() for vs in hs.values())
+        cortes = cortes_de([v for _, _, v in ta])
         doc["cidades"][chave] = {"referencia": c["referencia"], "lat": c["lat"], "lon": c["lon"],
-                                 "n_horas": len(ta), "cortes": cortes}
-        print(chave, len(ta), "horas; cortes:", cortes)
+                                 "n_horas": len(ta), "n_min_por_celula": n_min, "cortes": cortes, "cortes_mh": cortes_mh}
+        print(f"{chave}: {len(ta)} horas; mínimo de {n_min} horas por combinação mês-hora; cortes gerais: {cortes}")
+        print(f"{chave}: cortes às 9h e às 15h, por mês (P25 / P50 / P75 / P95):")
+        for m in sorted(grupos):
+            c9, c15 = cortes_mh[str(m)].get("9"), cortes_mh[str(m)].get("15")
+            f = lambda c: " / ".join(f"{c[k]:.1f}" for k in ("p25", "p50", "p75", "p95")) if c else "-"
+            print(f"  mês {m:2d}   9h: {f(c9)}   15h: {f(c15)}")
     if teste:
         print("modo teste: nada gravado")
         return
