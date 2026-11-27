@@ -1,0 +1,27 @@
+name: TermoTrânsito - calibrar faixas de conforto (climatologia)
+
+# Rode uma vez (Actions > este fluxo > Run workflow) e sempre que quiser atualizar o período.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  calibrar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Baixar climatologia e calcular os cortes
+        run: python calibrar_climatologia.py
+      - name: Gravar climatologia.json no repositório
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add climatologia.json
+          git diff --cached --quiet || git commit -m "Atualiza climatologia.json (faixas de conforto)"
+          git push
