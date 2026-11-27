@@ -22,17 +22,17 @@ A página `conforto.html` lê os JSON; nenhuma chave de API fica no navegador. S
 5. Exposição: `E = CT · t` (°C·min/km).
 6. **IDTE_V2** = percentil de `E` entre as últimas 1000 coletas do próprio ponto (0 a 100). Aparece só com pelo menos 100 coletas ("em formação" antes). Classes: baixa (< P50), moderada (P50 a < P90), alta (≥ P90 **e** carga térmica > 0).
 7. **Velocidade suavizada:** no passo 4 usa-se a mediana das últimas 3 leituras do ponto (`N_SUAVE`), para reduzir o ruído do tráfego. A velocidade bruta continua gravada.
-8. **Classe de conforto (independente do histórico do ponto):** a temperatura aparente do ponto (com o ajuste do Landsat) é comparada com os cortes P25, P50, P75 e P95 da climatologia local, guardados em `climatologia.json`: confortável (< P25), desconforto leve, moderado, alto e extremo (≥ P95). A climatologia é a temperatura aparente horária, das 5h às 19h, de 2015 a 2025, calculada com o histórico do Open-Meteo na coordenada de referência (Embrapa; UFRPE).
+8. **Classe de conforto (independente do histórico do ponto):** (a) classe de calor: a temperatura aparente do ponto (com o ajuste do Landsat) é comparada com os cortes P25, P50, P75 e P95 da climatologia local **do mesmo mês e da mesma hora** (`climatologia.json`, temperatura aparente horária de 2015 a 2025 do Open-Meteo na coordenada de referência): confortável, leve, moderado, alto, extremo; (b) trânsito: razão `v_suave / v_livre` ≥ 0,8 livre (+0), de 0,5 a 0,8 lento (+1 classe), < 0,5 congestionado (+2), limitado a extremo (`R_LENTO`, `R_CONGEST`).
 
-Parâmetros no topo de `coletor.py`: `T_REF`, `V_MIN`, `N_JANELA`, `N_MIN`, `P_MEDIANA`, `P_ALTO`, `N_SUAVE`. São convenções, ainda sem validação de campo. O percentil é relativo ao histórico de cada ponto e não permite comparar pontos entre si; para isso use a exposição.
+Parâmetros no topo de `coletor.py`: `T_REF`, `V_MIN`, `N_JANELA`, `N_MIN`, `P_MEDIANA`, `P_ALTO`, `N_SUAVE`, `R_LENTO`, `R_CONGEST`. São convenções, ainda sem validação de campo. O percentil é relativo ao histórico de cada ponto e não permite comparar pontos entre si; para isso use a exposição.
 
 ## Calibrar as faixas de conforto (fazer uma vez)
 
-Depois de subir os arquivos, vá em **Actions → "TermoTrânsito - calibrar faixas de conforto (climatologia)" → Run workflow**. O fluxo baixa 11 anos de dados do Open-Meteo, calcula os cortes e grava `climatologia.json` no repositório (cerca de 1 a 3 minutos). Enquanto esse arquivo não existir, os pontos aparecem como "faixas em calibração". Os cortes calculados ficam no log do fluxo. Para testar sem rede: `python calibrar_climatologia.py --teste`.
+Depois de subir os arquivos, vá em **Actions → "TermoTrânsito - calibrar faixas de conforto (climatologia)" → Run workflow**. O fluxo baixa 11 anos de dados do Open-Meteo, calcula os cortes por mês e hora e grava `climatologia.json` no repositório (cerca de 1 a 3 minutos). Enquanto esse arquivo não existir, os pontos aparecem como "faixas em calibração". Os cortes calculados ficam no log do fluxo. Para testar sem rede: `python calibrar_climatologia.py --teste`.
 
 ## Atualização de esquema
 
-O `hist2_*.csv` ganhou colunas (`ajuste_lst`, `temp_ajustada`, `classe_conforto`, `vel_suave`). Se o arquivo do dia no servidor tiver o cabeçalho antigo, `publicar_ftp.py` o guarda como `*.esquema-anterior` e começa um novo. Os `percentis_*.json` de versão anterior são descartados automaticamente (a exposição passou a usar a temperatura ajustada) e a janela recomeça, com nova fase "em formação" de cerca de 2 dias.
+O `hist2_*.csv` ganhou colunas (`ajuste_lst`, `temp_ajustada`, `classe_calor`, `transito`, `classe_conforto`, `vel_suave`). Se o arquivo do dia no servidor tiver o cabeçalho antigo, `publicar_ftp.py` o guarda como `*.esquema-anterior` e começa um novo. Os `percentis_*.json` de versão anterior são descartados automaticamente (a exposição passou a usar a temperatura ajustada) e a janela recomeça, com nova fase "em formação" de cerca de 2 dias.
 
 ## Partida a frio
 
