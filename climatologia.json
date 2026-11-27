@@ -1,0 +1,32 @@
+{
+ "versao": 1,
+ "periodo": "2015-2025",
+ "horas": "05-19",
+ "variavel": "temperatura aparente (Steadman, sem radiação)",
+ "cidades": {
+  "campina": {
+   "referencia": "Embrapa (Centenário)",
+   "lat": -7.22559,
+   "lon": -35.9053859,
+   "n_horas": 60270,
+   "cortes": {
+    "p25": 22.07,
+    "p50": 24.2,
+    "p75": 26.63,
+    "p95": 29.41
+   }
+  },
+  "recife": {
+   "referencia": "UFRPE (Dois Irmãos)",
+   "lat": -8.0175579,
+   "lon": -34.9492827,
+   "n_horas": 60270,
+   "cortes": {
+    "p25": 26.66,
+    "p50": 28.36,
+    "p75": 29.82,
+    "p95": 31.58
+   }
+  }
+ }
+}
