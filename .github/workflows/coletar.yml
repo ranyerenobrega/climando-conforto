@@ -36,6 +36,7 @@ jobs:
           TOMTOM_KEY: ${{ secrets.TOMTOM_KEY }}
           OWM_KEY: ${{ secrets.OWM_KEY }}
           TEMP_FONTE: ${{ vars.TEMP_FONTE || 'openmeteo' }}
+          K_LST: ${{ vars.K_LST || '0.25' }}
         run: python coletor.py
 
       - name: Publicar no HostGator (FTP)
