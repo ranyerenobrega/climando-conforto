@@ -1,5 +1,5 @@
 {
- "versao": 2,
+ "versao": 3,
  "periodo": "2015-2025",
  "horas": "05-19",
  "variavel": "temperatura aparente (Steadman, sem radiação)",
@@ -1121,6 +1121,248 @@
       "p95": 24.87
      }
     }
+   },
+   "idt_freq_geral": {
+    "sem_desconforto": 21.6,
+    "menos_metade": 51.7,
+    "mais_metade": 26.7,
+    "maioria": 0.0,
+    "estresse_forte": 0.0,
+    "emergencia": 0.0
+   },
+   "idt_freq_mes": {
+    "1": {
+     "sem_desconforto": 12.0,
+     "menos_metade": 45.7,
+     "mais_metade": 42.3,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "2": {
+     "sem_desconforto": 10.3,
+     "menos_metade": 43.9,
+     "mais_metade": 45.8,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "3": {
+     "sem_desconforto": 8.2,
+     "menos_metade": 47.8,
+     "mais_metade": 44.0,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "4": {
+     "sem_desconforto": 9.4,
+     "menos_metade": 50.6,
+     "mais_metade": 40.0,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "5": {
+     "sem_desconforto": 16.3,
+     "menos_metade": 59.2,
+     "mais_metade": 24.5,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "6": {
+     "sem_desconforto": 33.0,
+     "menos_metade": 62.7,
+     "mais_metade": 4.3,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "7": {
+     "sem_desconforto": 45.4,
+     "menos_metade": 54.3,
+     "mais_metade": 0.3,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "8": {
+     "sem_desconforto": 42.4,
+     "menos_metade": 55.8,
+     "mais_metade": 1.7,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "9": {
+     "sem_desconforto": 33.4,
+     "menos_metade": 58.0,
+     "mais_metade": 8.5,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "10": {
+     "sem_desconforto": 20.5,
+     "menos_metade": 51.9,
+     "mais_metade": 27.6,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "11": {
+     "sem_desconforto": 14.4,
+     "menos_metade": 45.1,
+     "mais_metade": 40.5,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "12": {
+     "sem_desconforto": 12.8,
+     "menos_metade": 45.5,
+     "mais_metade": 41.8,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    }
+   },
+   "idt_freq_hora": {
+    "5": {
+     "sem_desconforto": 88.1,
+     "menos_metade": 11.9,
+     "mais_metade": 0.0,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "6": {
+     "sem_desconforto": 83.7,
+     "menos_metade": 16.3,
+     "mais_metade": 0.0,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "7": {
+     "sem_desconforto": 49.1,
+     "menos_metade": 50.9,
+     "mais_metade": 0.0,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "8": {
+     "sem_desconforto": 26.8,
+     "menos_metade": 72.9,
+     "mais_metade": 0.3,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "9": {
+     "sem_desconforto": 10.5,
+     "menos_metade": 81.7,
+     "mais_metade": 7.8,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "10": {
+     "sem_desconforto": 2.3,
+     "menos_metade": 62.9,
+     "mais_metade": 34.8,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "11": {
+     "sem_desconforto": 0.9,
+     "menos_metade": 44.3,
+     "mais_metade": 54.8,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "12": {
+     "sem_desconforto": 0.4,
+     "menos_metade": 36.8,
+     "mais_metade": 62.8,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "13": {
+     "sem_desconforto": 0.4,
+     "menos_metade": 34.7,
+     "mais_metade": 65.0,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "14": {
+     "sem_desconforto": 0.3,
+     "menos_metade": 36.9,
+     "mais_metade": 62.8,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "15": {
+     "sem_desconforto": 0.5,
+     "menos_metade": 44.3,
+     "mais_metade": 55.1,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "16": {
+     "sem_desconforto": 1.6,
+     "menos_metade": 58.5,
+     "mais_metade": 40.0,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "17": {
+     "sem_desconforto": 6.5,
+     "menos_metade": 78.4,
+     "mais_metade": 15.1,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "18": {
+     "sem_desconforto": 20.6,
+     "menos_metade": 77.8,
+     "mais_metade": 1.7,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "19": {
+     "sem_desconforto": 32.1,
+     "menos_metade": 67.8,
+     "mais_metade": 0.1,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    }
+   },
+   "idt_mediana_15h": {
+    "1": 24.9,
+    "2": 25.0,
+    "3": 24.8,
+    "4": 24.7,
+    "5": 24.1,
+    "6": 23.1,
+    "7": 22.4,
+    "8": 22.8,
+    "9": 23.4,
+    "10": 24.3,
+    "11": 24.7,
+    "12": 24.8
    }
   },
   "recife": {
@@ -2240,6 +2482,248 @@
       "p95": 29.64
      }
     }
+   },
+   "idt_freq_geral": {
+    "sem_desconforto": 0.2,
+    "menos_metade": 24.2,
+    "mais_metade": 73.6,
+    "maioria": 2.0,
+    "estresse_forte": 0.0,
+    "emergencia": 0.0
+   },
+   "idt_freq_mes": {
+    "1": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 6.9,
+     "mais_metade": 90.0,
+     "maioria": 3.1,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "2": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 5.0,
+     "mais_metade": 89.6,
+     "maioria": 5.4,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "3": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 5.5,
+     "mais_metade": 86.3,
+     "maioria": 8.2,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "4": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 6.3,
+     "mais_metade": 87.5,
+     "maioria": 6.2,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "5": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 14.4,
+     "mais_metade": 85.1,
+     "maioria": 0.5,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "6": {
+     "sem_desconforto": 0.3,
+     "menos_metade": 36.2,
+     "mais_metade": 63.4,
+     "maioria": 0.1,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "7": {
+     "sem_desconforto": 0.7,
+     "menos_metade": 59.6,
+     "mais_metade": 39.7,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "8": {
+     "sem_desconforto": 1.2,
+     "menos_metade": 63.5,
+     "mais_metade": 35.3,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "9": {
+     "sem_desconforto": 0.2,
+     "menos_metade": 49.2,
+     "mais_metade": 50.6,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "10": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 25.5,
+     "mais_metade": 74.4,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "11": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 10.4,
+     "mais_metade": 89.4,
+     "maioria": 0.2,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "12": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 6.6,
+     "mais_metade": 93.1,
+     "maioria": 0.2,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    }
+   },
+   "idt_freq_hora": {
+    "5": {
+     "sem_desconforto": 1.7,
+     "menos_metade": 73.7,
+     "mais_metade": 24.7,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "6": {
+     "sem_desconforto": 1.4,
+     "menos_metade": 57.5,
+     "mais_metade": 41.1,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "7": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 37.7,
+     "mais_metade": 62.3,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "8": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 25.1,
+     "mais_metade": 74.9,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "9": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 14.6,
+     "mais_metade": 84.5,
+     "maioria": 0.9,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "10": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 7.2,
+     "mais_metade": 89.6,
+     "maioria": 3.1,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "11": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 4.3,
+     "mais_metade": 90.5,
+     "maioria": 5.2,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "12": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 3.4,
+     "mais_metade": 90.2,
+     "maioria": 6.4,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "13": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 4.0,
+     "mais_metade": 89.6,
+     "maioria": 6.4,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "14": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 5.9,
+     "mais_metade": 89.6,
+     "maioria": 4.5,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "15": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 9.9,
+     "mais_metade": 87.8,
+     "maioria": 2.3,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "16": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 17.3,
+     "mais_metade": 82.0,
+     "maioria": 0.6,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "17": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 28.0,
+     "mais_metade": 72.0,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "18": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 35.8,
+     "mais_metade": 64.2,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    },
+    "19": {
+     "sem_desconforto": 0.0,
+     "menos_metade": 39.0,
+     "mais_metade": 61.0,
+     "maioria": 0.0,
+     "estresse_forte": 0.0,
+     "emergencia": 0.0
+    }
+   },
+   "idt_mediana_15h": {
+    "1": 26.0,
+    "2": 26.3,
+    "3": 26.3,
+    "4": 26.2,
+    "5": 25.7,
+    "6": 24.8,
+    "7": 24.2,
+    "8": 24.1,
+    "9": 24.4,
+    "10": 25.0,
+    "11": 25.5,
+    "12": 25.8
    }
   }
  }
